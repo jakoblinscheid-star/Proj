@@ -1,5 +1,8 @@
 # Proj — keep a personal iPhone app alive without AltStore
 
+**New here?** Follow **[SETUP.md](SETUP.md)** for a zero-to-running walkthrough
+(first Xcode install → configure re-sign → launchd).
+
 Free Apple ID app signatures expire after **7 days**. This repo automates the
 re-sign + reinstall using only native Apple tooling (`xcodebuild` + `devicectl`),
 triggered by a `launchd` agent whenever you plug your iPhone into your Mac.
