@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- OPTION A (preferred): fire when a device pairs/connects. -->
+	<!-- launchd watches /var/db/lockdown, which changes almost instantly when
+	     an iPhone connects over USB. The script's own 5-day guard prevents
+	     unnecessary rebuilds on incidental connects. -->
+
+	<key>Label</key>
+	<string>com.personal.appresign.watch</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<!-- EDIT: absolute path to resign_and_install.sh on your Mac -->
+		<string>/Users/REPLACE_ME/path/to/mac/resign_and_install.sh</string>
+	</array>
+
+	<key>WatchPaths</key>
+	<array>
+		<string>/var/db/lockdown</string>
+	</array>
+
+	<!-- Give xcodebuild a sane PATH when launched by launchd. -->
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin</string>
+	</dict>
+
+	<key>RunAtLoad</key>
+	<false/>
+
+	<key>StandardOutPath</key>
+	<string>/tmp/appresign.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/appresign.err.log</string>
+</dict>
+</plist>
