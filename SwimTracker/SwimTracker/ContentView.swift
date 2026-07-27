@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Root tab bar: Home, Times, Meets, and Score.
+/// Root tab bar: Home, Times, Meets, Score, and Convert.
 struct ContentView: View {
     var body: some View {
         TabView {
@@ -15,6 +15,9 @@ struct ContentView: View {
 
             ScoreView()
                 .tabItem { Label("Score", systemImage: "chart.bar.fill") }
+
+            ConvertView()
+                .tabItem { Label("Convert", systemImage: "arrow.left.arrow.right") }
         }
     }
 }

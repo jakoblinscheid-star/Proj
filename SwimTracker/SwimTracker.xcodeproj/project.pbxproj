@@ -15,6 +15,11 @@
 		3B0000000000000000000006 /* TimesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000006 /* TimesView.swift */; };
 		3B0000000000000000000007 /* MeetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000007 /* MeetsView.swift */; };
 		3B0000000000000000000008 /* ScoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000008 /* ScoreView.swift */; };
+		3B000000000000000000000A /* SplitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000A /* SplitsView.swift */; };
+		3B000000000000000000000B /* BaseTimes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000B /* BaseTimes.swift */; };
+		3B000000000000000000000C /* BaseTimesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000C /* BaseTimesView.swift */; };
+		3B000000000000000000000D /* CourseConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000D /* CourseConverter.swift */; };
+		3B000000000000000000000E /* ConvertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000E /* ConvertView.swift */; };
 		3B0000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000009 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +33,11 @@
 		2B0000000000000000000006 /* TimesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimesView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000007 /* MeetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetsView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000008 /* ScoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreView.swift; sourceTree = "<group>"; };
+		2B000000000000000000000A /* SplitsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitsView.swift; sourceTree = "<group>"; };
+		2B000000000000000000000B /* BaseTimes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseTimes.swift; sourceTree = "<group>"; };
+		2B000000000000000000000C /* BaseTimesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseTimesView.swift; sourceTree = "<group>"; };
+		2B000000000000000000000D /* CourseConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseConverter.swift; sourceTree = "<group>"; };
+		2B000000000000000000000E /* ConvertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -69,6 +79,11 @@
 				2B0000000000000000000006 /* TimesView.swift */,
 				2B0000000000000000000007 /* MeetsView.swift */,
 				2B0000000000000000000008 /* ScoreView.swift */,
+				2B000000000000000000000A /* SplitsView.swift */,
+				2B000000000000000000000B /* BaseTimes.swift */,
+				2B000000000000000000000C /* BaseTimesView.swift */,
+				2B000000000000000000000D /* CourseConverter.swift */,
+				2B000000000000000000000E /* ConvertView.swift */,
 				2B0000000000000000000009 /* Assets.xcassets */,
 			);
 			path = SwimTracker;
@@ -151,6 +166,11 @@
 				3B0000000000000000000006 /* TimesView.swift in Sources */,
 				3B0000000000000000000007 /* MeetsView.swift in Sources */,
 				3B0000000000000000000008 /* ScoreView.swift in Sources */,
+				3B000000000000000000000A /* SplitsView.swift in Sources */,
+				3B000000000000000000000B /* BaseTimes.swift in Sources */,
+				3B000000000000000000000C /* BaseTimesView.swift in Sources */,
+				3B000000000000000000000D /* CourseConverter.swift in Sources */,
+				3B000000000000000000000E /* ConvertView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

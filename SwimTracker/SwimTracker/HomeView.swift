@@ -14,6 +14,9 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("SwimTracker")
+            .navigationDestination(for: Meet.self) { meet in
+                MeetDetailView(meetID: meet.id)
+            }
         }
     }
 
@@ -21,7 +24,9 @@ struct HomeView: View {
         List {
             Section {
                 ForEach(store.recentMeets()) { meet in
-                    MeetRowView(meet: meet)
+                    NavigationLink(value: meet) {
+                        MeetRowView(meet: meet)
+                    }
                 }
             } header: {
                 Text("Recent meets")

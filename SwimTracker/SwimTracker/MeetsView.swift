@@ -196,8 +196,8 @@ struct MeetEditView: View {
                 }
             }
             .sheet(isPresented: $showingEventEntry) {
-                ResultEntryView(draft: editingDraft) { event, seconds, note in
-                    applyDraft(event: event, seconds: seconds, note: note)
+                ResultEntryView(draft: editingDraft) { event, seconds, note, splits in
+                    applyDraft(event: event, seconds: seconds, note: note, splits: splits)
                 }
             }
         }
@@ -236,13 +236,14 @@ struct MeetEditView: View {
         return drafts.first { $0.id == editingDraftID }
     }
 
-    private func applyDraft(event: SwimEvent, seconds: Double?, note: String) {
+    private func applyDraft(event: SwimEvent, seconds: Double?, note: String, splits: [Double]) {
         if let editingDraftID, let index = drafts.firstIndex(where: { $0.id == editingDraftID }) {
             drafts[index].event = event
             drafts[index].seconds = seconds
             drafts[index].note = note
+            drafts[index].splits = splits
         } else {
-            drafts.append(ResultDraft(event: event, seconds: seconds, note: note))
+            drafts.append(ResultDraft(event: event, seconds: seconds, note: note, splits: splits))
         }
     }
 
@@ -251,7 +252,7 @@ struct MeetEditView: View {
         case .add:
             if let meetID = store.addMeet(name: name, team: team, location: location, date: date) {
                 for draft in drafts {
-                    store.addResult(toMeet: meetID, event: draft.event, seconds: draft.seconds, note: draft.note)
+                    store.addResult(toMeet: meetID, event: draft.event, seconds: draft.seconds, note: draft.note, splits: draft.splits)
                 }
             }
         case .edit(let meet):
@@ -267,6 +268,7 @@ struct ResultDraft: Identifiable {
     var event: SwimEvent
     var seconds: Double?
     var note: String
+    var splits: [Double] = []
 }
 
 private struct DraftRow: View {
@@ -319,8 +321,8 @@ struct MeetDetailView: View {
             }
         }
         .sheet(isPresented: $showingEventEntry) {
-            ResultEntryView(draft: editingDraft) { event, seconds, note in
-                applyResult(event: event, seconds: seconds, note: note)
+            ResultEntryView(draft: editingDraft) { event, seconds, note, splits in
+                applyResult(event: event, seconds: seconds, note: note, splits: splits)
             }
         }
     }
@@ -377,10 +379,10 @@ struct MeetDetailView: View {
 
     private var editingDraft: ResultDraft? {
         guard let editingResultID, let result = results.first(where: { $0.id == editingResultID }) else { return nil }
-        return ResultDraft(event: result.event, seconds: result.seconds, note: result.note)
+        return ResultDraft(event: result.event, seconds: result.seconds, note: result.note, splits: result.splits)
     }
 
-    private func applyResult(event: SwimEvent, seconds: Double?, note: String) {
+    private func applyResult(event: SwimEvent, seconds: Double?, note: String, splits: [Double]) {
         if let editingResultID,
            let existing = results.first(where: { $0.id == editingResultID }) {
             store.updateTime(id: editingResultID,
@@ -391,9 +393,10 @@ struct MeetDetailView: View {
                              date: existing.date,
                              meetID: meetID,
                              isRelay: event.isRelay,
-                             note: note)
+                             note: note,
+                             splits: splits)
         } else {
-            store.addResult(toMeet: meetID, event: event, seconds: seconds, note: note)
+            store.addResult(toMeet: meetID, event: event, seconds: seconds, note: note, splits: splits)
         }
     }
 
@@ -423,6 +426,14 @@ struct ResultRow: View {
                     Text(result.note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                if result.hasSplits {
+                    Text(result.splits.count <= 4
+                          ? result.splits.map(\.asSwimTime).joined(separator: " · ")
+                          : "\(result.splits.count) × 50 splits")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
                 }
             }
 
@@ -457,7 +468,7 @@ struct ResultEntryView: View {
 
     /// Pass an existing draft to edit it; leave nil to add a new one.
     let draft: ResultDraft?
-    let onSave: (SwimEvent, Double?, String) -> Void
+    let onSave: (SwimEvent, Double?, String, [Double]) -> Void
 
     @State private var isRelay: Bool
     @State private var course: Course
@@ -466,20 +477,35 @@ struct ResultEntryView: View {
     @State private var minutes: Int
     @State private var seconds: Int
     @State private var hundredths: Int
+    @State private var splitValues: [Double]
     @State private var note: String
 
-    init(draft: ResultDraft?, onSave: @escaping (SwimEvent, Double?, String) -> Void) {
+    init(draft: ResultDraft?, onSave: @escaping (SwimEvent, Double?, String, [Double]) -> Void) {
         self.draft = draft
         self.onSave = onSave
         let event = draft?.event
-        _isRelay = State(initialValue: event?.isRelay ?? false)
+        let initialDistance = event?.distance ?? 100
+        let initialRelay = event?.isRelay ?? false
+        _isRelay = State(initialValue: initialRelay)
         _course = State(initialValue: event?.course ?? .scy)
         _stroke = State(initialValue: event?.stroke ?? .freestyle)
-        _distance = State(initialValue: event?.distance ?? 100)
+        _distance = State(initialValue: initialDistance)
         let components = (draft?.seconds ?? 0).swimTimeComponents
         _minutes = State(initialValue: components.minutes)
         _seconds = State(initialValue: components.seconds)
         _hundredths = State(initialValue: components.hundredths)
+        let expected = SwimSplits.fiftyCount(distance: initialDistance, isRelay: initialRelay)
+        var initialSplits = draft?.splits ?? []
+        if expected >= 2 {
+            if initialSplits.count < expected {
+                initialSplits.append(contentsOf: Array(repeating: 0, count: expected - initialSplits.count))
+            } else if initialSplits.count > expected {
+                initialSplits = Array(initialSplits.prefix(expected))
+            }
+        } else {
+            initialSplits = []
+        }
+        _splitValues = State(initialValue: initialSplits)
         _note = State(initialValue: draft?.note ?? "")
     }
 
@@ -506,7 +532,8 @@ struct ResultEntryView: View {
 
     private var previewScore: Int? {
         guard !isRelay, totalSeconds > 0 else { return nil }
-        return SwimScore.points(seconds: totalSeconds, distance: distance, stroke: stroke, course: course, gender: store.gender)
+        return store.baseSeconds(for: SwimEvent(distance: distance, stroke: stroke, course: course))
+            .flatMap { SwimScore.points(seconds: totalSeconds, base: $0) }
     }
 
     private var canSave: Bool {
@@ -560,6 +587,15 @@ struct ResultEntryView: View {
                     .foregroundStyle(totalSeconds > 0 ? Theme.accent : .secondary)
                 }
 
+                SplitEntrySection(
+                    distance: distance,
+                    unit: course.unit,
+                    isRelay: isRelay,
+                    splits: $splitValues,
+                    finalSeconds: totalSeconds,
+                    onUseSplitTotal: applyFinalTime
+                )
+
                 Section("Note") {
                     TextField("Note (optional)", text: $note)
                 }
@@ -607,9 +643,16 @@ struct ResultEntryView: View {
         }
     }
 
+    private func applyFinalTime(_ value: Double) {
+        let components = value.swimTimeComponents
+        minutes = components.minutes
+        seconds = components.seconds
+        hundredths = components.hundredths
+    }
+
     private func save() {
         guard canSave else { return }
-        onSave(selectedEvent, totalSeconds > 0 ? totalSeconds : nil, note)
+        onSave(selectedEvent, totalSeconds > 0 ? totalSeconds : nil, note, splitValues)
         dismiss()
     }
 }

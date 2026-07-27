@@ -6,8 +6,11 @@ import Charts
 struct ScoreView: View {
     @Environment(Store.self) private var store
 
-    /// Progression graph scope: nil = all times, otherwise a specific team.
-    @State private var progressionTeam: String? = nil
+    /// Scope for overall / top events / year chart: nil = all times, otherwise a team.
+    @State private var selectedTeam: String? = nil
+    @State private var showingBaseTimes = false
+
+    private var selectedOverall: OverallScore { store.overall(team: selectedTeam) }
 
     var body: some View {
         NavigationStack {
@@ -20,10 +23,24 @@ struct ScoreView: View {
             }
             .navigationTitle("Score")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { genderMenu }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingBaseTimes = true
+                    } label: {
+                        Label("Base Times", systemImage: "trophy.fill")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingBaseTimes) {
+                BaseTimesView()
             }
             .navigationDestination(for: SwimEvent.self) { event in
                 EventDetailView(event: event)
+            }
+            .onChange(of: teams) { _, teams in
+                if let selectedTeam, !teams.contains(selectedTeam) {
+                    self.selectedTeam = nil
+                }
             }
         }
     }
@@ -41,22 +58,42 @@ struct ScoreView: View {
     }
 
     private var overallSection: some View {
-        let overall = store.allTimesOverall
+        let overall = selectedOverall
         return Section {
-            VStack(spacing: 6) {
-                Text("\(overall.value)")
-                    .font(.system(size: 60, weight: .bold, design: .default))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.scoreColor(overall.value))
-                Text("Overall swim score")
-                    .font(.headline)
-                Text(overallCaption(overall))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+            if !teams.isEmpty {
+                Picker("Team", selection: $selectedTeam) {
+                    Text("All times").tag(String?.none)
+                    ForEach(teams, id: \.self) { team in
+                        Text(team).tag(String?.some(team))
+                    }
+                }
+                .pickerStyle(.menu)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+
+            if overall.isEmpty {
+                Text("No scored swims for this team yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 6) {
+                    Text("\(overall.value)")
+                        .font(.system(size: 60, weight: .bold, design: .default))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.scoreColor(overall.value))
+                    Text("Overall swim score")
+                        .font(.headline)
+                    Text(overallCaption(overall))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+        } footer: {
+            Text(overallFooter)
         }
     }
 
@@ -66,21 +103,18 @@ struct ScoreView: View {
         return "Weighted average of your best \(count) event\(count == 1 ? "" : "s")"
     }
 
+    private var overallFooter: String {
+        if let team = selectedTeam {
+            return "Showing overall for \(team)."
+        }
+        return "Showing overall across all times."
+    }
+
     // MARK: Progression
 
     private var progressionSection: some View {
-        let data = store.yearlyOveralls(team: progressionTeam)
+        let data = store.yearlyOveralls(team: selectedTeam)
         return Section {
-            if !teams.isEmpty {
-                Picker("Scope", selection: $progressionTeam) {
-                    Text("All times").tag(String?.none)
-                    ForEach(teams, id: \.self) { team in
-                        Text(team).tag(String?.some(team))
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-
             if data.isEmpty {
                 Text("No scored swims for this selection yet.")
                     .font(.subheadline)
@@ -96,7 +130,7 @@ struct ScoreView: View {
     }
 
     private var progressionFooter: String {
-        if let team = progressionTeam {
+        if let team = selectedTeam {
             return "Each point is your overall from swims with \(team) that year."
         }
         return "Each point is your overall from all swims that year."
@@ -139,18 +173,21 @@ struct ScoreView: View {
 
     // MARK: Top events
 
+    @ViewBuilder
     private var topEventsSection: some View {
-        let overall = store.allTimesOverall
-        return Section {
-            ForEach(overall.components) { component in
-                NavigationLink(value: component.event) {
-                    ScoreComponentRow(component: component)
+        let overall = selectedOverall
+        if !overall.isEmpty {
+            Section {
+                ForEach(overall.components) { component in
+                    NavigationLink(value: component.event) {
+                        ScoreComponentRow(component: component)
+                    }
                 }
+            } header: {
+                Text("Top events")
+            } footer: {
+                Text("Your best four events, weighted 40% / 40% / 15% / 5% (renormalised when you have fewer).")
             }
-        } header: {
-            Text("Top events")
-        } footer: {
-            Text("Your best four events, weighted 40% / 40% / 15% / 5% (renormalised when you have fewer).")
         }
     }
 
@@ -188,25 +225,7 @@ struct ScoreView: View {
 
     private var teams: [String] { store.teamOveralls.map(\.team) }
 
-    // MARK: Toolbar & empty state
-
-    private var genderMenu: some View {
-        Menu {
-            ForEach(Gender.allCases) { gender in
-                Button {
-                    store.gender = gender
-                } label: {
-                    if store.gender == gender {
-                        Label(gender.label, systemImage: "checkmark")
-                    } else {
-                        Text(gender.label)
-                    }
-                }
-            }
-        } label: {
-            Label(store.gender.label, systemImage: "person.fill")
-        }
-    }
+    // MARK: Empty state
 
     private var emptyState: some View {
         ContentUnavailableView {

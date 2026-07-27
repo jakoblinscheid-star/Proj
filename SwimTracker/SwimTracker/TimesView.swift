@@ -7,6 +7,7 @@ struct TimesView: View {
     @Environment(Store.self) private var store
 
     @State private var showingAdd = false
+    @State private var showingBaseTimes = false
     @State private var courseFilter: Course? = nil
     @State private var sortMode: SortMode = .score
 
@@ -28,12 +29,15 @@ struct TimesView: View {
             }
             .navigationTitle("Times")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { genderMenu }
+                ToolbarItem(placement: .topBarLeading) { baseTimesButton }
                 ToolbarItem(placement: .topBarTrailing) { sortMenu }
                 ToolbarItem(placement: .topBarTrailing) { addButton }
             }
             .sheet(isPresented: $showingAdd) {
                 AddTimeView()
+            }
+            .sheet(isPresented: $showingBaseTimes) {
+                BaseTimesView()
             }
             .navigationDestination(for: SwimEvent.self) { event in
                 EventDetailView(event: event)
@@ -68,7 +72,7 @@ struct TimesView: View {
                         eventLink(event)
                     }
                 } footer: {
-                    Text("World Aquatics points for \(store.gender.label.lowercased()), best time per event.")
+                    Text("World Aquatics points (men), best time per event.")
                 }
             case .event:
                 ForEach(coursesToShow) { course in
@@ -116,21 +120,11 @@ struct TimesView: View {
 
     // MARK: Toolbar pieces
 
-    private var genderMenu: some View {
-        Menu {
-            ForEach(Gender.allCases) { gender in
-                Button {
-                    store.gender = gender
-                } label: {
-                    if store.gender == gender {
-                        Label(gender.label, systemImage: "checkmark")
-                    } else {
-                        Text(gender.label)
-                    }
-                }
-            }
+    private var baseTimesButton: some View {
+        Button {
+            showingBaseTimes = true
         } label: {
-            Label(store.gender.label, systemImage: "person.fill")
+            Label("Base Times", systemImage: "trophy.fill")
         }
     }
 
@@ -256,6 +250,7 @@ struct AddTimeView: View {
     @State private var minutes = 0
     @State private var seconds = 0
     @State private var hundredths = 0
+    @State private var splitValues: [Double]
     @State private var date = Date()
     @State private var meetID: String? = nil
     @State private var note = ""
@@ -263,13 +258,27 @@ struct AddTimeView: View {
     init(presetEvent: SwimEvent? = nil, editing: SwimTime? = nil) {
         editingID = editing?.id
         let event = editing?.event ?? presetEvent
+        let initialDistance = event?.distance ?? 100
+        let initialRelay = event?.isRelay ?? false
         _course = State(initialValue: event?.course ?? .scy)
         _stroke = State(initialValue: event?.stroke ?? .freestyle)
-        _distance = State(initialValue: event?.distance ?? 100)
+        _distance = State(initialValue: initialDistance)
         let components = (editing?.seconds ?? 0).swimTimeComponents
         _minutes = State(initialValue: components.minutes)
         _seconds = State(initialValue: components.seconds)
         _hundredths = State(initialValue: components.hundredths)
+        let expected = SwimSplits.fiftyCount(distance: initialDistance, isRelay: initialRelay)
+        var initialSplits = editing?.splits ?? []
+        if expected >= 2 {
+            if initialSplits.count < expected {
+                initialSplits.append(contentsOf: Array(repeating: 0, count: expected - initialSplits.count))
+            } else if initialSplits.count > expected {
+                initialSplits = Array(initialSplits.prefix(expected))
+            }
+        } else {
+            initialSplits = []
+        }
+        _splitValues = State(initialValue: initialSplits)
         _date = State(initialValue: editing?.date ?? Date())
         _meetID = State(initialValue: editing?.meetID)
         _note = State(initialValue: editing?.note ?? "")
@@ -291,7 +300,8 @@ struct AddTimeView: View {
     }
 
     private var previewScore: Int? {
-        SwimScore.points(seconds: totalSeconds, distance: distance, stroke: stroke, course: course, gender: store.gender)
+        store.baseSeconds(for: SwimEvent(distance: distance, stroke: stroke, course: course))
+            .flatMap { SwimScore.points(seconds: totalSeconds, base: $0) }
     }
 
     private var canSave: Bool {
@@ -303,6 +313,14 @@ struct AddTimeView: View {
             Form {
                 eventSection
                 timeSection
+                SplitEntrySection(
+                    distance: distance,
+                    unit: course.unit,
+                    isRelay: false,
+                    splits: $splitValues,
+                    finalSeconds: totalSeconds,
+                    onUseSplitTotal: applyFinalTime
+                )
                 detailsSection
             }
             .navigationTitle(editingID == nil ? "Add Time" : "Edit Time")
@@ -391,6 +409,13 @@ struct AddTimeView: View {
         }
     }
 
+    private func applyFinalTime(_ value: Double) {
+        let components = value.swimTimeComponents
+        minutes = components.minutes
+        seconds = components.seconds
+        hundredths = components.hundredths
+    }
+
     private func save() {
         guard canSave else { return }
         var swimDate = date
@@ -406,7 +431,8 @@ struct AddTimeView: View {
                              date: swimDate,
                              meetID: meetID,
                              isRelay: false,
-                             note: note)
+                             note: note,
+                             splits: splitValues)
         } else {
             store.addTime(distance: distance,
                           stroke: stroke,
@@ -414,7 +440,8 @@ struct AddTimeView: View {
                           seconds: totalSeconds,
                           date: swimDate,
                           meetID: meetID,
-                          note: note)
+                          note: note,
+                          splits: splitValues)
         }
         dismiss()
     }
@@ -422,24 +449,31 @@ struct AddTimeView: View {
 
 // MARK: - Event detail
 
-/// All recorded times for an event plus a progression graph.
+/// Best time (with splits) at the top, then progression, then the rest of the times.
 struct EventDetailView: View {
     @Environment(Store.self) private var store
     let event: SwimEvent
 
     @State private var showingAdd = false
     @State private var editingTime: SwimTime? = nil
+    @State private var expandedTimeID: String? = nil
 
     private var recorded: [SwimTime] { store.recordedTimes(for: event) }
     private var best: SwimTime? { store.bestTime(for: event) }
+    private var otherTimes: [SwimTime] {
+        guard let bestID = best?.id else { return Array(recorded.reversed()) }
+        return recorded.reversed().filter { $0.id != bestID }
+    }
 
     var body: some View {
         List {
-            summarySection
+            bestSection
             if recorded.count >= 2 {
                 progressionSection
             }
-            historySection
+            if !otherTimes.isEmpty {
+                otherTimesSection
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle(event.name)
@@ -461,44 +495,92 @@ struct EventDetailView: View {
         }
     }
 
-    private var summarySection: some View {
+    private var bestSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(event.fullName)
-                    .font(.headline)
-                Text(event.course.label)
-                    .font(.subheadline)
+            if let best {
+                Button {
+                    editingTime = best
+                } label: {
+                    bestHeader(best)
+                }
+                .buttonStyle(.plain)
+
+                if best.hasSplits {
+                    SplitsBreakdownView(
+                        distance: event.distance,
+                        unit: event.course.unit,
+                        isRelay: event.isRelay,
+                        splits: best.splits
+                    )
+                }
+            } else {
+                Text("No timed swim yet.")
                     .foregroundStyle(.secondary)
-
-                HStack {
-                    statBlock(title: "Best time", value: best?.seconds?.asSwimTime ?? "—")
-                    Spacer()
-                    if let best, let score = store.score(for: best) {
-                        statBlock(title: "Swim score", value: "\(score)", trailing: true)
-                    }
-                }
-
-                if let drop = improvement {
-                    Label("Dropped \(drop.asSwimTime) since your first swim", systemImage: "arrow.down.right")
-                        .font(.caption)
-                        .foregroundStyle(Theme.success)
-                }
             }
-            .padding(.vertical, 4)
+        } header: {
+            Text("Best time")
+        } footer: {
+            if best?.hasSplits != true, SwimSplits.supportsSplits(distance: event.distance) {
+                Text("Tap the best time to add splits.")
+            } else {
+                Text("Tap the best time to edit it.")
+            }
         }
     }
 
-    private func statBlock(title: String, value: String, trailing: Bool = false) -> some View {
-        VStack(alignment: trailing ? .trailing : .leading, spacing: 2) {
-            Text(title.uppercased())
-                .font(.caption2)
-                .tracking(0.5)
+    private func bestHeader(_ best: SwimTime) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(event.fullName)
+                .font(.headline)
+                .foregroundStyle(.primary)
+            Text(event.course.label)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 28, weight: .bold, design: .default))
-                .monospacedDigit()
-                .foregroundStyle(Theme.accent)
+
+            HStack(alignment: .firstTextBaseline) {
+                Text(best.seconds?.asSwimTime ?? "—")
+                    .font(.system(size: 36, weight: .bold, design: .default))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.accent)
+                Spacer()
+                if let score = store.score(for: best) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("SWIM SCORE")
+                            .font(.caption2)
+                            .tracking(0.5)
+                            .foregroundStyle(.secondary)
+                        Text("\(score)")
+                            .font(.title2.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.scoreColor(score))
+                    }
+                }
+            }
+
+            Text(bestSubtitle(best))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if let drop = improvement {
+                Label("Dropped \(drop.asSwimTime) since your first swim", systemImage: "arrow.down.right")
+                    .font(.caption)
+                    .foregroundStyle(Theme.success)
+            }
+
+            if !best.hasSplits, SwimSplits.supportsSplits(distance: event.distance) {
+                Text("No splits recorded")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(.vertical, 4)
+    }
+
+    private func bestSubtitle(_ best: SwimTime) -> String {
+        if let meetName = store.meetName(for: best) {
+            return "\(best.date.asShortDate) · \(meetName)"
+        }
+        return best.date.asShortDate
     }
 
     /// Time dropped from the first recorded swim to the best swim (if improved).
@@ -544,28 +626,52 @@ struct EventDetailView: View {
         }
     }
 
-    private var historySection: some View {
+    private var otherTimesSection: some View {
         Section {
-            ForEach(recorded.reversed()) { time in
-                Button {
-                    editingTime = time
+            ForEach(otherTimes) { time in
+                DisclosureGroup(isExpanded: expansionBinding(for: time.id)) {
+                    if time.hasSplits {
+                        SplitsBreakdownView(
+                            distance: event.distance,
+                            unit: event.course.unit,
+                            isRelay: event.isRelay,
+                            splits: time.splits
+                        )
+                    } else {
+                        Text(SwimSplits.supportsSplits(distance: event.distance)
+                             ? "No splits recorded"
+                             : "Splits aren’t available for this distance")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Edit time") {
+                        editingTime = time
+                    }
                 } label: {
-                    TimeRowView(time: time, isBest: time.id == best?.id)
+                    TimeRowView(time: time, isBest: false, showsSplitPreview: false)
                 }
-                .buttonStyle(.plain)
             }
-            .onDelete(perform: deleteTimes)
+            .onDelete(perform: deleteOtherTimes)
         } header: {
-            Text("All times")
+            Text("Other times")
         } footer: {
-            Text("Tap a time to edit it.")
+            Text("Tap a time to show splits. Use Edit time to change it.")
         }
     }
 
-    private func deleteTimes(at offsets: IndexSet) {
-        let reversed = Array(recorded.reversed())
+    private func expansionBinding(for id: String) -> Binding<Bool> {
+        Binding(
+            get: { expandedTimeID == id },
+            set: { expandedTimeID = $0 ? id : (expandedTimeID == id ? nil : expandedTimeID) }
+        )
+    }
+
+    private func deleteOtherTimes(at offsets: IndexSet) {
         for index in offsets {
-            store.deleteTime(id: reversed[index].id)
+            let id = otherTimes[index].id
+            if expandedTimeID == id { expandedTimeID = nil }
+            store.deleteTime(id: id)
         }
     }
 }
@@ -575,6 +681,7 @@ struct TimeRowView: View {
     @Environment(Store.self) private var store
     let time: SwimTime
     let isBest: Bool
+    var showsSplitPreview: Bool = true
 
     var body: some View {
         HStack(spacing: 12) {
@@ -605,6 +712,14 @@ struct TimeRowView: View {
                     Text(time.note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                if showsSplitPreview, time.hasSplits {
+                    Text(time.splits.count <= 4
+                          ? time.splits.map(\.asSwimTime).joined(separator: " · ")
+                          : "\(time.splits.count) × 50 splits")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
                 }
             }
 

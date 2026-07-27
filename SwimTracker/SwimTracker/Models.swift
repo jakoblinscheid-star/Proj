@@ -62,15 +62,6 @@ enum Stroke: String, Codable, CaseIterable, Identifiable {
     var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
 }
 
-/// Whose base times to score against. World Aquatics points are gender specific.
-enum Gender: String, Codable, CaseIterable, Identifiable {
-    case men = "M"
-    case women = "F"
-
-    var id: String { rawValue }
-    var label: String { self == .men ? "Men" : "Women" }
-}
-
 /// A specific event: a distance + stroke in a particular course. Relays reuse this
 /// type with `isRelay == true` and `stroke` acting as the relay type (`.freestyle`
 /// or `.medley`); `distance` is then the per-leg distance of a 4-person relay.
@@ -120,12 +111,18 @@ struct SwimTime: Identifiable, Codable, Hashable {
     var stroke: Stroke
     var course: Course
     var seconds: Double? = nil
+    /// Interval time for each 50 of the race. Empty when splits were not recorded.
+    /// When present, count must equal `distance / 50` and every value must be > 0.
+    var splits: [Double] = []
     var date: Date = Date()
     var meetID: String? = nil
     var isRelay: Bool = false
     var note: String = ""
 
     var event: SwimEvent { SwimEvent(distance: distance, stroke: stroke, course: course, isRelay: isRelay) }
+
+    /// True when a full set of 50-interval splits is stored for this swim.
+    var hasSplits: Bool { SwimSplits.isComplete(splits, distance: distance, isRelay: isRelay) }
 }
 
 // MARK: - Backward-compatible decoding
@@ -150,7 +147,7 @@ extension Meet {
 
 extension SwimTime {
     enum CodingKeys: String, CodingKey {
-        case id, distance, stroke, course, seconds, date, meetID, isRelay, note
+        case id, distance, stroke, course, seconds, splits, date, meetID, isRelay, note
     }
 
     init(from decoder: Decoder) throws {
@@ -160,6 +157,7 @@ extension SwimTime {
         stroke = try container.decode(Stroke.self, forKey: .stroke)
         course = try container.decode(Course.self, forKey: .course)
         seconds = try container.decodeIfPresent(Double.self, forKey: .seconds)
+        splits = try container.decodeIfPresent([Double].self, forKey: .splits) ?? []
         date = try container.decodeIfPresent(Date.self, forKey: .date) ?? Date()
         meetID = try container.decodeIfPresent(String.self, forKey: .meetID)
         isRelay = try container.decodeIfPresent(Bool.self, forKey: .isRelay) ?? false
@@ -167,146 +165,78 @@ extension SwimTime {
     }
 }
 
+// MARK: - Splits
+
+/// Helpers for 50-interval split storage and aggregated display (50s, 100s, …).
+enum SwimSplits {
+    /// How many 50s make up an individual event. Relays and odd distances return 0.
+    static func fiftyCount(distance: Int, isRelay: Bool = false) -> Int {
+        guard !isRelay, distance >= 100, distance % 50 == 0 else { return 0 }
+        return distance / 50
+    }
+
+    static func supportsSplits(distance: Int, isRelay: Bool = false) -> Bool {
+        fiftyCount(distance: distance, isRelay: isRelay) >= 2
+    }
+
+    static func isComplete(_ splits: [Double], distance: Int, isRelay: Bool = false) -> Bool {
+        let expected = fiftyCount(distance: distance, isRelay: isRelay)
+        return expected >= 2
+            && splits.count == expected
+            && splits.allSatisfy { $0 > 0 }
+    }
+
+    /// Segment lengths for the view control (e.g. 200 → 50, 100).
+    static func displayModes(distance: Int, isRelay: Bool = false) -> [Int] {
+        guard supportsSplits(distance: distance, isRelay: isRelay) else { return [] }
+        let preferred = [50, 100, 200, 500]
+        var modes = preferred.filter { $0 < distance && distance % $0 == 0 }
+        let half = distance / 2
+        if half >= 50, half % 50 == 0, half < distance, !modes.contains(half) {
+            modes.append(half)
+            modes.sort()
+        }
+        return modes
+    }
+
+    /// Collapse 50-interval splits into larger equal segments (e.g. 4×50 → 2×100).
+    static func aggregate(_ splits: [Double], segmentDistance: Int) -> [Double]? {
+        guard segmentDistance >= 50, segmentDistance % 50 == 0 else { return nil }
+        let group = segmentDistance / 50
+        guard group > 0, !splits.isEmpty, splits.count % group == 0 else { return nil }
+        return stride(from: 0, to: splits.count, by: group).map { index in
+            splits[index..<(index + group)].reduce(0, +)
+        }
+    }
+
+    static func rangeLabel(index: Int, segmentDistance: Int, unit: String) -> String {
+        let start = index * segmentDistance
+        let end = start + segmentDistance
+        return "\(start)–\(end) \(unit)"
+    }
+
+    static func modeLabel(_ segmentDistance: Int) -> String {
+        "\(segmentDistance)s"
+    }
+
+    /// Persist only a complete set of 50 splits; otherwise store nothing.
+    static func normalized(_ splits: [Double], distance: Int, isRelay: Bool = false) -> [Double] {
+        isComplete(splits, distance: distance, isRelay: isRelay) ? splits : []
+    }
+}
+
 // MARK: - Scoring (World Aquatics points)
 
 /// World Aquatics ("FINA") point scoring: `P = 1000 * (base / time)^3`.
 /// Matching the base time is 1000 points; faster is more. Points are truncated
-/// to an integer, exactly as World Aquatics defines them.
+/// to an integer, exactly as World Aquatics defines them. Men-only for this app.
 enum SwimScore {
-    static func baseTime(distance: Int, stroke: Stroke, course: Course, gender: Gender) -> Double? {
-        BaseTimes.table[gender]?[EventKey(course: course, stroke: stroke, distance: distance)]
-    }
-
-    static func points(seconds: Double, distance: Int, stroke: Stroke, course: Course, gender: Gender) -> Int? {
-        guard seconds > 0,
-              let base = baseTime(distance: distance, stroke: stroke, course: course, gender: gender),
-              base > 0
-        else { return nil }
+    static func points(seconds: Double, base: Double) -> Int? {
+        guard seconds > 0, base > 0 else { return nil }
         let value = 1000.0 * pow(base / seconds, 3)
         guard value.isFinite, value >= 0 else { return nil }
         return Int(value)
     }
-}
-
-private struct EventKey: Hashable {
-    let course: Course
-    let stroke: Stroke
-    let distance: Int
-}
-
-/// Base ("1000-point") times in seconds.
-///
-/// - LCM / SCM use World Aquatics base times (current world records).
-/// - SCY uses U.S. Open records (fastest yards time swum in the United States).
-///
-/// These are the benchmarks a swim of 1000 points would match; update them here
-/// when new records are set.
-enum BaseTimes {
-    static let table: [Gender: [EventKey: Double]] = [
-        .men: build(men),
-        .women: build(women)
-    ]
-
-    /// The catalog of individual events that can be scored for a course, in heat-sheet order.
-    static func events(for course: Course) -> [SwimEvent] {
-        let keys = (table[.men] ?? [:]).keys.filter { $0.course == course }
-        return keys
-            .map { SwimEvent(distance: $0.distance, stroke: $0.stroke, course: $0.course) }
-            .sorted(by: <)
-    }
-
-    /// The standard relay events for a course (per-leg distances of a 4-person relay).
-    static func relayEvents(for course: Course) -> [SwimEvent] {
-        let freeLegs: [Int]
-        let medleyLegs: [Int]
-        switch course {
-        case .scy, .scm:
-            freeLegs = [50, 100, 200]
-            medleyLegs = [50, 100]
-        case .lcm:
-            freeLegs = [100, 200]
-            medleyLegs = [100]
-        }
-        let free = freeLegs.map { SwimEvent(distance: $0, stroke: .freestyle, course: course, isRelay: true) }
-        let medley = medleyLegs.map { SwimEvent(distance: $0, stroke: .medley, course: course, isRelay: true) }
-        return free + medley
-    }
-
-    private static func build(_ entries: [(Course, Stroke, Int, Double)]) -> [EventKey: Double] {
-        var result: [EventKey: Double] = [:]
-        for (course, stroke, distance, seconds) in entries {
-            result[EventKey(course: course, stroke: stroke, distance: distance)] = seconds
-        }
-        return result
-    }
-
-    // MARK: Men
-
-    private static let men: [(Course, Stroke, Int, Double)] = [
-        // Long course meters (World Aquatics base times)
-        (.lcm, .freestyle, 50, 20.91), (.lcm, .freestyle, 100, 46.40), (.lcm, .freestyle, 200, 102.00),
-        (.lcm, .freestyle, 400, 219.96), (.lcm, .freestyle, 800, 452.12), (.lcm, .freestyle, 1500, 870.67),
-        (.lcm, .backstroke, 50, 23.55), (.lcm, .backstroke, 100, 51.60), (.lcm, .backstroke, 200, 111.92),
-        (.lcm, .breaststroke, 50, 25.95), (.lcm, .breaststroke, 100, 56.88), (.lcm, .breaststroke, 200, 125.48),
-        (.lcm, .butterfly, 50, 22.27), (.lcm, .butterfly, 100, 49.45), (.lcm, .butterfly, 200, 110.34),
-        (.lcm, .medley, 200, 112.69), (.lcm, .medley, 400, 242.50),
-
-        // Short course meters (World Aquatics base times)
-        (.scm, .freestyle, 50, 19.90), (.scm, .freestyle, 100, 44.84), (.scm, .freestyle, 200, 98.61),
-        (.scm, .freestyle, 400, 212.25), (.scm, .freestyle, 800, 440.46), (.scm, .freestyle, 1500, 846.88),
-        (.scm, .backstroke, 50, 22.11), (.scm, .backstroke, 100, 48.33), (.scm, .backstroke, 200, 105.63),
-        (.scm, .breaststroke, 50, 24.95), (.scm, .breaststroke, 100, 55.28), (.scm, .breaststroke, 200, 120.16),
-        (.scm, .butterfly, 50, 21.32), (.scm, .butterfly, 100, 47.71), (.scm, .butterfly, 200, 106.85),
-        (.scm, .medley, 100, 49.28), (.scm, .medley, 200, 108.88), (.scm, .medley, 400, 234.81),
-
-        // Short course yards (U.S. Open records)
-        (.scy, .freestyle, 50, 17.63), (.scy, .freestyle, 100, 39.83), (.scy, .freestyle, 200, 88.33),
-        (.scy, .freestyle, 500, 242.31), (.scy, .freestyle, 1000, 512.83), (.scy, .freestyle, 1650, 850.03),
-        (.scy, .backstroke, 100, 42.61), (.scy, .backstroke, 200, 94.13),
-        (.scy, .breaststroke, 100, 49.51), (.scy, .breaststroke, 200, 106.35),
-        (.scy, .butterfly, 100, 42.49), (.scy, .butterfly, 200, 96.41),
-        (.scy, .medley, 200, 96.34), (.scy, .medley, 400, 208.82),
-
-        // Short course yards — no official U.S. Open record exists for these events.
-        // Drop in a reference time (in seconds) to enable scoring; 0 leaves the
-        // event loggable but unscored. e.g. a 46.97 = 46.97, a 1:02.36 = 62.36.
-        (.scy, .backstroke, 50, 20.07), (.scy, .breaststroke, 50, 22.96), (.scy, .butterfly, 50, 19.90),
-        (.scy, .medley, 100, 46.33)  // Shaine Casas
-    ]
-
-    // MARK: Women
-
-    private static let women: [(Course, Stroke, Int, Double)] = [
-        // Long course meters (World Aquatics base times)
-        (.lcm, .freestyle, 50, 23.61), (.lcm, .freestyle, 100, 51.71), (.lcm, .freestyle, 200, 112.23),
-        (.lcm, .freestyle, 400, 234.18), (.lcm, .freestyle, 800, 484.12), (.lcm, .freestyle, 1500, 920.48),
-        (.lcm, .backstroke, 50, 26.86), (.lcm, .backstroke, 100, 57.13), (.lcm, .backstroke, 200, 123.14),
-        (.lcm, .breaststroke, 50, 29.16), (.lcm, .breaststroke, 100, 64.13), (.lcm, .breaststroke, 200, 137.55),
-        (.lcm, .butterfly, 50, 24.43), (.lcm, .butterfly, 100, 54.60), (.lcm, .butterfly, 200, 121.81),
-        (.lcm, .medley, 200, 125.70), (.lcm, .medley, 400, 263.65),
-
-        // Short course meters (World Aquatics base times)
-        (.scm, .freestyle, 50, 22.83), (.scm, .freestyle, 100, 50.25), (.scm, .freestyle, 200, 110.31),
-        (.scm, .freestyle, 400, 230.25), (.scm, .freestyle, 800, 477.42), (.scm, .freestyle, 1500, 908.24),
-        (.scm, .backstroke, 50, 25.25), (.scm, .backstroke, 100, 54.02), (.scm, .backstroke, 200, 118.83),
-        (.scm, .breaststroke, 50, 28.37), (.scm, .breaststroke, 100, 62.36), (.scm, .breaststroke, 200, 132.72),
-        (.scm, .butterfly, 50, 23.94), (.scm, .butterfly, 100, 52.71), (.scm, .butterfly, 200, 119.32),
-        (.scm, .medley, 100, 55.11), (.scm, .medley, 200, 121.63), (.scm, .medley, 400, 255.48),
-
-        // Short course yards (U.S. Open records)
-        (.scy, .freestyle, 50, 20.37), (.scy, .freestyle, 100, 44.71), (.scy, .freestyle, 200, 99.10),
-        (.scy, .freestyle, 500, 264.06), (.scy, .freestyle, 1000, 539.65), (.scy, .freestyle, 1650, 899.62),
-        (.scy, .backstroke, 100, 48.10), (.scy, .backstroke, 200, 106.09),
-        (.scy, .breaststroke, 100, 55.73), (.scy, .breaststroke, 200, 121.29),
-        (.scy, .butterfly, 100, 46.97), (.scy, .butterfly, 200, 108.33),
-        (.scy, .medley, 200, 108.37), (.scy, .medley, 400, 234.60),
-
-        // Short course yards — no official U.S. Open record exists for these events.
-        // Drop in a reference time (in seconds) to enable scoring; 0 leaves the
-        // event loggable but unscored. e.g. a 46.97 = 46.97, a 1:02.36 = 62.36.
-        (.scy, .backstroke, 50, 0.0), (.scy, .breaststroke, 50, 0.0), (.scy, .butterfly, 50, 0.0),
-        (.scy, .medley, 100, 0.0)
-    ]
 }
 
 // MARK: - Overall score
@@ -362,19 +292,22 @@ final class Store {
         didSet { saveTimes() }
     }
 
-    /// Whose base times are used to score times into World Aquatics points.
-    var gender: Gender = .men {
-        didSet { saveTimes() }
+    /// Per-event overrides of the baked-in men's 1000-point base times.
+    /// Keyed by `BaseTimes.key(course:stroke:distance:)`. Empty means use defaults.
+    var baseTimeOverrides: [String: Double] = [:] {
+        didSet { saveBaseTimes() }
     }
 
     @ObservationIgnored private let meetsURL: URL
     @ObservationIgnored private let timesURL: URL
+    @ObservationIgnored private let baseTimesURL: URL
     @ObservationIgnored private var isLoading = false
 
     init() {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         meetsURL = dir.appendingPathComponent("swimtracker.v1.json")
         timesURL = dir.appendingPathComponent("swimtracker.times.v1.json")
+        baseTimesURL = dir.appendingPathComponent("swimtracker.basetimes.v1.json")
         load()
     }
 
@@ -457,15 +390,53 @@ final class Store {
         }
     }
 
-    /// World Aquatics points for a single recorded swim, using the current gender.
+    /// World Aquatics points for a single recorded swim (men's base times).
     /// Relays and not-yet-timed entries have no score.
     func score(for time: SwimTime) -> Int? {
-        guard !time.isRelay, let seconds = time.seconds else { return nil }
-        return SwimScore.points(seconds: seconds,
-                                distance: time.distance,
-                                stroke: time.stroke,
-                                course: time.course,
-                                gender: gender)
+        guard !time.isRelay, let seconds = time.seconds,
+              let base = baseSeconds(for: time.event)
+        else { return nil }
+        return SwimScore.points(seconds: seconds, base: base)
+    }
+
+    /// Effective 1000-point base time for an event (override, else baked-in default).
+    func baseSeconds(for event: SwimEvent) -> Double? {
+        let key = BaseTimes.key(for: event)
+        if let override = baseTimeOverrides[key] {
+            return override > 0 ? override : nil
+        }
+        return BaseTimes.defaultSeconds(for: event)
+    }
+
+    /// Whether this event's base time has been customized on device.
+    func hasCustomBaseTime(for event: SwimEvent) -> Bool {
+        baseTimeOverrides[BaseTimes.key(for: event)] != nil
+    }
+
+    /// Update one event's base time. Matching the baked-in default clears the override.
+    func setBaseTime(for event: SwimEvent, seconds: Double) {
+        let key = BaseTimes.key(for: event)
+        let rounded = (seconds * 100).rounded() / 100
+        var next = baseTimeOverrides
+        if let factory = BaseTimes.defaultSeconds(for: event), abs(factory - rounded) < 0.005 {
+            next.removeValue(forKey: key)
+        } else if rounded > 0 {
+            next[key] = rounded
+        } else {
+            // Explicit 0 disables scoring for this event.
+            next[key] = 0
+        }
+        baseTimeOverrides = next
+    }
+
+    func clearBaseTimeOverride(for event: SwimEvent) {
+        var next = baseTimeOverrides
+        next.removeValue(forKey: BaseTimes.key(for: event))
+        baseTimeOverrides = next
+    }
+
+    func resetAllBaseTimes() {
+        baseTimeOverrides = [:]
     }
 
     /// Points for the fastest time in an event (the swimmer's best score there).
@@ -519,6 +490,13 @@ final class Store {
     /// The overall across every recorded time.
     var allTimesOverall: OverallScore { overallScore(for: times) }
 
+    /// Overall for all times, or only swims that count toward a specific team.
+    func overall(team: String? = nil) -> OverallScore {
+        guard let team else { return allTimesOverall }
+        let scoped = times.filter { teamKey(for: $0) == team }
+        return overallScore(for: scoped)
+    }
+
     /// The team a recorded time counts toward, or nil if it should only feed the
     /// all-times overall (a time not linked to any meet). Meets with no team name
     /// group under "Unattached".
@@ -564,11 +542,12 @@ final class Store {
             .sorted { $0.year < $1.year }
     }
 
-    func addTime(distance: Int, stroke: Stroke, course: Course, seconds: Double?, date: Date, meetID: String?, isRelay: Bool = false, note: String) {
+    func addTime(distance: Int, stroke: Stroke, course: Course, seconds: Double?, date: Date, meetID: String?, isRelay: Bool = false, note: String, splits: [Double] = []) {
         let time = SwimTime(distance: distance,
                             stroke: stroke,
                             course: course,
                             seconds: normalized(seconds),
+                            splits: SwimSplits.normalized(splits, distance: distance, isRelay: isRelay),
                             date: date,
                             meetID: meetID,
                             isRelay: isRelay,
@@ -576,12 +555,13 @@ final class Store {
         times.append(time)
     }
 
-    func updateTime(id: String, distance: Int, stroke: Stroke, course: Course, seconds: Double?, date: Date, meetID: String?, isRelay: Bool, note: String) {
+    func updateTime(id: String, distance: Int, stroke: Stroke, course: Course, seconds: Double?, date: Date, meetID: String?, isRelay: Bool, note: String, splits: [Double] = []) {
         guard let index = times.firstIndex(where: { $0.id == id }) else { return }
         times[index].distance = distance
         times[index].stroke = stroke
         times[index].course = course
         times[index].seconds = normalized(seconds)
+        times[index].splits = SwimSplits.normalized(splits, distance: distance, isRelay: isRelay)
         times[index].date = date
         times[index].meetID = meetID
         times[index].isRelay = isRelay
@@ -605,7 +585,7 @@ final class Store {
     }
 
     /// A recorded event (with or without a time) attached to a meet.
-    func addResult(toMeet meetID: String, event: SwimEvent, seconds: Double?, note: String = "") {
+    func addResult(toMeet meetID: String, event: SwimEvent, seconds: Double?, note: String = "", splits: [Double] = []) {
         let date = meet(id: meetID)?.date ?? Date()
         addTime(distance: event.distance,
                 stroke: event.stroke,
@@ -614,14 +594,33 @@ final class Store {
                 date: date,
                 meetID: meetID,
                 isRelay: event.isRelay,
-                note: note)
+                note: note,
+                splits: splits)
     }
 
     // MARK: Persistence
 
     private struct TimesData: Codable {
-        var gender: Gender = .men
         var times: [SwimTime] = []
+
+        enum CodingKeys: String, CodingKey { case times, gender }
+
+        init(times: [SwimTime]) { self.times = times }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            times = try container.decodeIfPresent([SwimTime].self, forKey: .times) ?? []
+            // Older files stored a gender toggle; men-only now, so it's ignored.
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(times, forKey: .times)
+        }
+    }
+
+    private struct BaseTimesData: Codable {
+        var overrides: [String: Double] = [:]
     }
 
     private func load() {
@@ -635,8 +634,12 @@ final class Store {
 
         if let data = try? Data(contentsOf: timesURL),
            let decoded = try? JSONDecoder.swimTracker.decode(TimesData.self, from: data) {
-            gender = decoded.gender
             times = decoded.times
+        }
+
+        if let data = try? Data(contentsOf: baseTimesURL),
+           let decoded = try? JSONDecoder.swimTracker.decode(BaseTimesData.self, from: data) {
+            baseTimeOverrides = decoded.overrides
         }
     }
 
@@ -648,9 +651,16 @@ final class Store {
 
     private func saveTimes() {
         guard !isLoading else { return }
-        let payload = TimesData(gender: gender, times: times)
+        let payload = TimesData(times: times)
         guard let data = try? JSONEncoder.swimTracker.encode(payload) else { return }
         try? data.write(to: timesURL, options: [.atomic])
+    }
+
+    private func saveBaseTimes() {
+        guard !isLoading else { return }
+        let payload = BaseTimesData(overrides: baseTimeOverrides)
+        guard let data = try? JSONEncoder.swimTracker.encode(payload) else { return }
+        try? data.write(to: baseTimesURL, options: [.atomic])
     }
 }
 
