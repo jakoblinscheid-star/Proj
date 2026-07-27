@@ -2,7 +2,7 @@
 
 This repo has two pieces:
 
-1. **The apps** — native SwiftUI iOS apps (`TabTrackApp/`, `SwimTracker/`) you build in Xcode.
+1. **The apps** — native SwiftUI iOS apps (`SwimTracker/`, `TabTrackApp/`) you build in Xcode.
 2. **The re-sign toolchain** — `mac/` scripts that re-archive and reinstall every ~5 days so a free Apple ID’s **7-day** signature never expires.
 
 You need a **Mac**. The apps will not build on Windows. Clone or copy this repo onto the Mac and do everything below there.
@@ -22,23 +22,23 @@ You need a **Mac**. The apps will not build on Windows. Clone or copy this repo 
 
 ## Part A — First install of an app (do this once)
 
-Pick one app. These instructions use **TabTrack**; SwimTracker is the same with different names (see the end of this section).
+Pick one app. These instructions use **SwimTracker**; TabTrack is the same with different names (see the end of this section).
 
 ### 1. Open the project
 
 ```bash
 # wherever you put the repo on the Mac, e.g.:
 cd ~/Proj
-open TabTrackApp/TabTrack.xcodeproj
+open SwimTracker/SwimTracker.xcodeproj
 ```
 
 ### 2. Fix signing
 
-In Xcode, select the **TabTrack** target → **Signing & Capabilities**:
+In Xcode, select the **SwimTracker** target → **Signing & Capabilities**:
 
 1. Check **Automatically manage signing**.
 2. Set **Team** to your Apple ID (Personal Team is fine).
-3. Change **Bundle Identifier** from `com.yourname.tabtrack` to something unique, e.g. `com.yourname.tabtrack`.
+3. Change **Bundle Identifier** from `com.yourname.swimtracker` to something unique, e.g. `com.yourname.swimtracker`.
 
 Apple will reject a bundle ID someone else already registered under another team.
 
@@ -56,15 +56,15 @@ On the iPhone:
 
 Open the app again from the home screen. If it launches, Part A is done.
 
-### SwimTracker instead (or as well)
+### TabTrack instead (or as well)
 
 Same steps, but:
 
-- Open `SwimTracker/SwimTracker.xcodeproj`
-- Target / scheme: **SwimTracker**
-- Bundle ID example: `com.yourname.swimtracker`
+- Open `TabTrackApp/TabTrack.xcodeproj`
+- Target / scheme: **TabTrack**
+- Bundle ID example: `com.yourname.tabtrack`
 
-The re-sign script below is pre-wired for **TabTrack**. To automate SwimTracker, change `PROJECT` and `SCHEME` in the script (Part B).
+The re-sign script below is pre-wired for **SwimTracker**. To automate TabTrack, change `PROJECT` and `SCHEME` in the script (Part B).
 
 ---
 
@@ -94,8 +94,8 @@ Open `mac/resign_and_install.sh` and set the CONFIG block at the top:
 
 | Variable | What to put |
 | --- | --- |
-| `PROJECT` | Absolute path to the `.xcodeproj` on **this** Mac. Default assumes `$HOME/Proj/TabTrackApp/TabTrack.xcodeproj` — change the prefix if your clone isn’t at `~/Proj`. |
-| `SCHEME` | `TabTrack` (or `SwimTracker`) |
+| `PROJECT` | Absolute path to the `.xcodeproj` on **this** Mac. Default assumes `$HOME/Proj/SwimTracker/SwimTracker.xcodeproj` — change the prefix if your clone isn’t at `~/Proj`. |
+| `SCHEME` | `SwimTracker` (or `TabTrack`) |
 | `TEAM_ID` | Your 10-character Team ID |
 | `DEVICE_UDID` | Your UDID, or `""` for auto |
 
@@ -216,5 +216,5 @@ launchctl unload ~/Library/LaunchAgents/com.personal.appresign.poll.plist
 ## More detail
 
 - Re-sign design notes: [README.md](README.md)
-- TabTrack app: [TabTrackApp/README.md](TabTrackApp/README.md)
 - SwimTracker app: [SwimTracker/README.md](SwimTracker/README.md)
+- TabTrack app: [TabTrackApp/README.md](TabTrackApp/README.md)

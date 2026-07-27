@@ -22,21 +22,6 @@ struct ContentView: View {
     }
 }
 
-/// Reusable placeholder for tabs whose details are still being designed.
-struct ComingSoonView: View {
-    let title: String
-    let systemImage: String
-    let message: String
-
-    var body: some View {
-        ContentUnavailableView {
-            Label(title, systemImage: systemImage)
-        } description: {
-            Text(message)
-        }
-    }
-}
-
 #Preview {
     ContentView()
         .environment(Store())

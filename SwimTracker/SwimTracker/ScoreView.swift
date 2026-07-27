@@ -2,23 +2,41 @@ import SwiftUI
 import Charts
 
 /// Score tab: your overall swim score (a weighted average of your best events),
-/// an overall for each team you've competed under, and a year-by-year graph.
+/// or a calculator that turns an event + time into World Aquatics points.
 struct ScoreView: View {
     @Environment(Store.self) private var store
 
+    enum Mode: String, CaseIterable, Identifiable {
+        case yourScore = "Your Score"
+        case calc = "Calc"
+        var id: String { rawValue }
+    }
+
+    @State private var mode: Mode = .yourScore
     /// Scope for overall / top events / year chart: nil = all times, otherwise a team.
     @State private var selectedTeam: String? = nil
     @State private var showingBaseTimes = false
+    @State private var showingSettings = false
 
     private var selectedOverall: OverallScore { store.overall(team: selectedTeam) }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.allTimesOverall.isEmpty {
-                    emptyState
-                } else {
-                    content
+            VStack(spacing: 0) {
+                Picker("Mode", selection: $mode) {
+                    ForEach(Mode.allCases) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+
+                switch mode {
+                case .yourScore:
+                    yourScoreContent
+                case .calc:
+                    CalcScoreView()
                 }
             }
             .navigationTitle("Score")
@@ -30,9 +48,19 @@ struct ScoreView: View {
                         Label("Base Times", systemImage: "trophy.fill")
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
+                }
             }
             .sheet(isPresented: $showingBaseTimes) {
                 BaseTimesView()
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
             .navigationDestination(for: SwimEvent.self) { event in
                 EventDetailView(event: event)
@@ -45,16 +73,21 @@ struct ScoreView: View {
         }
     }
 
-    // MARK: Content
+    // MARK: Your Score
 
-    private var content: some View {
-        List {
-            overallSection
-            progressionSection
-            topEventsSection
-            teamsSection
+    @ViewBuilder
+    private var yourScoreContent: some View {
+        if store.allTimesOverall.isEmpty {
+            emptyState
+        } else {
+            List {
+                overallSection
+                progressionSection
+                topEventsSection
+                teamsSection
+            }
+            .listStyle(.insetGrouped)
         }
-        .listStyle(.insetGrouped)
     }
 
     private var overallSection: some View {
@@ -104,10 +137,11 @@ struct ScoreView: View {
     }
 
     private var overallFooter: String {
+        let gender = store.settings.gender.rawValue.lowercased()
         if let team = selectedTeam {
-            return "Showing overall for \(team)."
+            return "Showing overall for \(team), scored as \(gender). Change gender in Settings."
         }
-        return "Showing overall across all times."
+        return "Showing overall across all times, scored as \(gender). Change gender in Settings."
     }
 
     // MARK: Progression
@@ -232,6 +266,143 @@ struct ScoreView: View {
             Label("No score yet", systemImage: "chart.bar.fill")
         } description: {
             Text("Add timed swims in the Times or Meets tab to build your overall swim score.")
+        }
+    }
+}
+
+// MARK: - Calc score
+
+/// Hypothetical World Aquatics points for an event + time (does not save a swim).
+struct CalcScoreView: View {
+    @Environment(Store.self) private var store
+
+    @State private var gender: Gender = .male
+    @State private var course: Course = .scy
+    @State private var stroke: Stroke = .freestyle
+    @State private var distance: Int = 100
+    @State private var minutes = 0
+    @State private var seconds = 0
+    @State private var hundredths = 0
+    @State private var didApplyDefaults = false
+
+    private var availableStrokes: [Stroke] {
+        let set = Set(BaseTimes.events(for: course).map(\.stroke))
+        return Stroke.allCases.filter { set.contains($0) }
+    }
+
+    private var availableDistances: [Int] {
+        BaseTimes.events(for: course)
+            .filter { $0.stroke == stroke }
+            .map(\.distance)
+    }
+
+    private var event: SwimEvent {
+        SwimEvent(distance: distance, stroke: stroke, course: course)
+    }
+
+    private var totalSeconds: Double {
+        Double(minutes * 60 + seconds) + Double(hundredths) / 100.0
+    }
+
+    private var baseSeconds: Double? {
+        store.baseSeconds(for: event, gender: gender)
+    }
+
+    private var calculatedPoints: Int? {
+        guard totalSeconds > 0, let base = baseSeconds else { return nil }
+        return SwimScore.points(seconds: totalSeconds, base: base)
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Gender", selection: $gender) {
+                    ForEach(Gender.allCases) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("Course", selection: $course) {
+                    ForEach(Course.allCases) { course in
+                        Text(course.rawValue).tag(course)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("Stroke", selection: $stroke) {
+                    ForEach(availableStrokes) { stroke in
+                        Text(stroke.fullName).tag(stroke)
+                    }
+                }
+
+                Picker("Distance", selection: $distance) {
+                    ForEach(availableDistances, id: \.self) { distance in
+                        Text("\(distance) \(course.unit)").tag(distance)
+                    }
+                }
+            } header: {
+                Text("Event")
+            }
+
+            Section {
+                SwimTimeWheels(minutes: $minutes, seconds: $seconds, hundredths: $hundredths)
+            } header: {
+                Text("Time")
+            }
+
+            Section {
+                if let points = calculatedPoints {
+                    VStack(spacing: 6) {
+                        Text("\(points)")
+                            .font(.system(size: 60, weight: .bold, design: .default))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.scoreColor(points))
+                        Text("World Aquatics pts")
+                            .font(.headline)
+                        Text("\(gender.rawValue) · \(event.name) · \(totalSeconds.asSwimTime)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                } else if totalSeconds > 0, baseSeconds == nil {
+                    Text("No base time for this event — it can’t be scored.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Pick an event and enter a time.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Score")
+            } footer: {
+                if let base = baseSeconds {
+                    Text("\(gender.rawValue) base time \(base.asSwimTime) = 1000 pts. Formula: 1000 × (base ÷ time)³.")
+                } else {
+                    Text("Uses \(gender.rawValue.lowercased()) World Aquatics / U.S. Open base times (editable under Base Times).")
+                }
+            }
+        }
+        .onChange(of: course) { _, _ in reconcileEventSelection() }
+        .onChange(of: stroke) { _, _ in reconcileEventSelection() }
+        .onAppear {
+            if !didApplyDefaults {
+                gender = store.settings.gender
+                course = store.settings.defaultCourse
+                didApplyDefaults = true
+            }
+            reconcileEventSelection()
+        }
+    }
+
+    private func reconcileEventSelection() {
+        if !availableStrokes.contains(stroke) {
+            stroke = availableStrokes.first ?? .freestyle
+        }
+        if !availableDistances.contains(distance) {
+            distance = availableDistances.first ?? distance
         }
     }
 }

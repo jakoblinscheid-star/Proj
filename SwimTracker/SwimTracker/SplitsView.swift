@@ -64,6 +64,14 @@ struct SplitEntrySection: View {
             }
 
             if let splitTotal {
+                HStack {
+                    Text("Split total")
+                    Spacer()
+                    Text(splitTotal.asSwimTime)
+                        .monospacedDigit()
+                        .foregroundStyle(footerIsWarning ? Theme.danger : .primary)
+                }
+
                 Button("Set final time from splits") {
                     onUseSplitTotal?(splitTotal)
                 }
@@ -77,8 +85,10 @@ struct SplitEntrySection: View {
         } header: {
             Text("Splits (each 50)")
         } footer: {
-            Text(footerText)
+            Label(footerText, systemImage: footerIsWarning ? "exclamationmark.triangle.fill" : "info.circle")
+                .font(.footnote)
                 .foregroundStyle(footerIsWarning ? Theme.danger : .secondary)
+                .symbolRenderingMode(.hierarchical)
         }
         .onAppear { resizeIfNeeded() }
         .onChange(of: distance) { _, _ in resizeIfNeeded() }
@@ -107,7 +117,7 @@ struct SplitEntrySection: View {
                 if abs(splitTotal - finalSeconds) < 0.005 {
                     return "Splits sum to \(splitTotal.asSwimTime), matching the final time."
                 }
-                return "Splits sum to \(splitTotal.asSwimTime); final time is \(finalSeconds.asSwimTime)."
+                return "Splits don’t add up — total \(splitTotal.asSwimTime) vs final \(finalSeconds.asSwimTime)."
             }
             return "Splits sum to \(splitTotal.asSwimTime). Save them, or set the final time from the total."
         }

@@ -38,6 +38,55 @@ enum Course: String, Codable, CaseIterable, Identifiable {
     var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
 }
 
+/// Whose base times to score against. World Aquatics points are gender-specific.
+enum Gender: String, Codable, CaseIterable, Identifiable {
+    case male = "Male"
+    case female = "Female"
+
+    var id: String { rawValue }
+}
+
+/// How the Times tab orders events.
+enum TimesSortMode: String, Codable, CaseIterable, Identifiable {
+    case score = "Swim score"
+    case event = "Event"
+
+    var id: String { rawValue }
+
+    var systemImage: String { self == .score ? "rosette" : "list.number" }
+}
+
+/// User preferences persisted separately from meet/time data.
+struct AppSettings: Codable, Equatable {
+    /// Gender used for Times badges, Your Score, and score previews.
+    var gender: Gender = .male
+    /// Pre-selected course when adding times, meet results, Calc, Convert, and Base Times.
+    var defaultCourse: Course = .scy
+    /// Default (and remembered) sort order on the Times tab.
+    var timesSortMode: TimesSortMode = .score
+
+    enum CodingKeys: String, CodingKey {
+        case gender, defaultCourse, timesSortMode
+    }
+
+    init(
+        gender: Gender = .male,
+        defaultCourse: Course = .scy,
+        timesSortMode: TimesSortMode = .score
+    ) {
+        self.gender = gender
+        self.defaultCourse = defaultCourse
+        self.timesSortMode = timesSortMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        gender = try container.decodeIfPresent(Gender.self, forKey: .gender) ?? .male
+        defaultCourse = try container.decodeIfPresent(Course.self, forKey: .defaultCourse) ?? .scy
+        timesSortMode = try container.decodeIfPresent(TimesSortMode.self, forKey: .timesSortMode) ?? .score
+    }
+}
+
 /// The four strokes plus individual medley.
 enum Stroke: String, Codable, CaseIterable, Identifiable {
     case freestyle = "Free"
@@ -229,7 +278,8 @@ enum SwimSplits {
 
 /// World Aquatics ("FINA") point scoring: `P = 1000 * (base / time)^3`.
 /// Matching the base time is 1000 points; faster is more. Points are truncated
-/// to an integer, exactly as World Aquatics defines them. Men-only for this app.
+/// to an integer, exactly as World Aquatics defines them. Base times are
+/// gender-specific (see `Gender` / `BaseTimes`).
 enum SwimScore {
     static func points(seconds: Double, base: Double) -> Int? {
         guard seconds > 0, base > 0 else { return nil }
@@ -292,15 +342,21 @@ final class Store {
         didSet { saveTimes() }
     }
 
-    /// Per-event overrides of the baked-in men's 1000-point base times.
-    /// Keyed by `BaseTimes.key(course:stroke:distance:)`. Empty means use defaults.
+    /// Per-event overrides of the baked-in 1000-point base times.
+    /// Keyed by `BaseTimes.key(gender:course:stroke:distance:)`. Empty means use defaults.
     var baseTimeOverrides: [String: Double] = [:] {
         didSet { saveBaseTimes() }
+    }
+
+    /// Profile preferences: scoring gender, default course, Times sort.
+    var settings: AppSettings = AppSettings() {
+        didSet { saveSettings() }
     }
 
     @ObservationIgnored private let meetsURL: URL
     @ObservationIgnored private let timesURL: URL
     @ObservationIgnored private let baseTimesURL: URL
+    @ObservationIgnored private let settingsURL: URL
     @ObservationIgnored private var isLoading = false
 
     init() {
@@ -308,6 +364,7 @@ final class Store {
         meetsURL = dir.appendingPathComponent("swimtracker.v1.json")
         timesURL = dir.appendingPathComponent("swimtracker.times.v1.json")
         baseTimesURL = dir.appendingPathComponent("swimtracker.basetimes.v1.json")
+        settingsURL = dir.appendingPathComponent("swimtracker.settings.v1.json")
         load()
     }
 
@@ -390,8 +447,8 @@ final class Store {
         }
     }
 
-    /// World Aquatics points for a single recorded swim (men's base times).
-    /// Relays and not-yet-timed entries have no score.
+    /// World Aquatics points for a single recorded swim, using the profile gender
+    /// from Settings. Relays and not-yet-timed entries have no score.
     func score(for time: SwimTime) -> Int? {
         guard !time.isRelay, let seconds = time.seconds,
               let base = baseSeconds(for: time.event)
@@ -400,25 +457,29 @@ final class Store {
     }
 
     /// Effective 1000-point base time for an event (override, else baked-in default).
-    func baseSeconds(for event: SwimEvent) -> Double? {
-        let key = BaseTimes.key(for: event)
+    /// Defaults to the profile gender from Settings when `gender` is omitted.
+    func baseSeconds(for event: SwimEvent, gender: Gender? = nil) -> Double? {
+        let resolved = gender ?? settings.gender
+        let key = BaseTimes.key(gender: resolved, for: event)
         if let override = baseTimeOverrides[key] {
             return override > 0 ? override : nil
         }
-        return BaseTimes.defaultSeconds(for: event)
+        return BaseTimes.defaultSeconds(for: event, gender: resolved)
     }
 
     /// Whether this event's base time has been customized on device.
-    func hasCustomBaseTime(for event: SwimEvent) -> Bool {
-        baseTimeOverrides[BaseTimes.key(for: event)] != nil
+    func hasCustomBaseTime(for event: SwimEvent, gender: Gender? = nil) -> Bool {
+        let resolved = gender ?? settings.gender
+        return baseTimeOverrides[BaseTimes.key(gender: resolved, for: event)] != nil
     }
 
     /// Update one event's base time. Matching the baked-in default clears the override.
-    func setBaseTime(for event: SwimEvent, seconds: Double) {
-        let key = BaseTimes.key(for: event)
+    func setBaseTime(for event: SwimEvent, gender: Gender? = nil, seconds: Double) {
+        let resolved = gender ?? settings.gender
+        let key = BaseTimes.key(gender: resolved, for: event)
         let rounded = (seconds * 100).rounded() / 100
         var next = baseTimeOverrides
-        if let factory = BaseTimes.defaultSeconds(for: event), abs(factory - rounded) < 0.005 {
+        if let factory = BaseTimes.defaultSeconds(for: event, gender: resolved), abs(factory - rounded) < 0.005 {
             next.removeValue(forKey: key)
         } else if rounded > 0 {
             next[key] = rounded
@@ -429,9 +490,10 @@ final class Store {
         baseTimeOverrides = next
     }
 
-    func clearBaseTimeOverride(for event: SwimEvent) {
+    func clearBaseTimeOverride(for event: SwimEvent, gender: Gender? = nil) {
+        let resolved = gender ?? settings.gender
         var next = baseTimeOverrides
-        next.removeValue(forKey: BaseTimes.key(for: event))
+        next.removeValue(forKey: BaseTimes.key(gender: resolved, for: event))
         baseTimeOverrides = next
     }
 
@@ -610,7 +672,7 @@ final class Store {
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             times = try container.decodeIfPresent([SwimTime].self, forKey: .times) ?? []
-            // Older files stored a gender toggle; men-only now, so it's ignored.
+            // Older files stored a gender toggle; profile gender now lives in settings.
         }
 
         func encode(to encoder: Encoder) throws {
@@ -641,6 +703,11 @@ final class Store {
            let decoded = try? JSONDecoder.swimTracker.decode(BaseTimesData.self, from: data) {
             baseTimeOverrides = decoded.overrides
         }
+
+        if let data = try? Data(contentsOf: settingsURL),
+           let decoded = try? JSONDecoder.swimTracker.decode(AppSettings.self, from: data) {
+            settings = decoded
+        }
     }
 
     private func saveMeets() {
@@ -661,6 +728,12 @@ final class Store {
         let payload = BaseTimesData(overrides: baseTimeOverrides)
         guard let data = try? JSONEncoder.swimTracker.encode(payload) else { return }
         try? data.write(to: baseTimesURL, options: [.atomic])
+    }
+
+    private func saveSettings() {
+        guard !isLoading else { return }
+        guard let data = try? JSONEncoder.swimTracker.encode(settings) else { return }
+        try? data.write(to: settingsURL, options: [.atomic])
     }
 }
 

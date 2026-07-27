@@ -25,12 +25,12 @@ set -u -o pipefail
 # ---------------------------------------------------------------------------
 
 # Absolute path to your .xcodeproj OR .xcworkspace (the script auto-detects which).
-# Points at the native TabTrack app in this repo. Adjust the prefix to wherever
+# Points at the native SwimTracker app in this repo. Adjust the prefix to wherever
 # you cloned/copied the repo on your Mac.
-PROJECT="$HOME/Proj/TabTrackApp/TabTrack.xcodeproj"
+PROJECT="$HOME/Proj/SwimTracker/SwimTracker.xcodeproj"
 
 # The scheme to build (Xcode > Product > Scheme > Manage Schemes; must be "Shared").
-SCHEME="TabTrack"
+SCHEME="SwimTracker"
 
 # 10-character Apple Development Team ID (must match ExportOptions.plist).
 TEAM_ID="REPLACE_WITH_TEAM_ID"

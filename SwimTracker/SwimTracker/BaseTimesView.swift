@@ -1,14 +1,17 @@
 import SwiftUI
 
-/// Edit the men's 1000-point base times used for scoring. Changes save on device
-/// as overrides; Reset restores the baked-in defaults from `BaseTimes.swift`.
+/// Edit the 1000-point base times used for scoring (male or female). Changes
+/// save on device as overrides; Reset restores the baked-in defaults from
+/// `BaseTimes.swift`.
 struct BaseTimesView: View {
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
 
+    @State private var gender: Gender = .male
     @State private var courseFilter: Course = .scy
     @State private var editingEvent: SwimEvent? = nil
     @State private var confirmingReset = false
+    @State private var didApplyDefaults = false
 
     private var events: [SwimEvent] {
         BaseTimes.events(for: courseFilter)
@@ -18,6 +21,14 @@ struct BaseTimesView: View {
         NavigationStack {
             List {
                 Section {
+                    Picker("Gender", selection: $gender) {
+                        ForEach(Gender.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
                     Picker("Course", selection: $courseFilter) {
                         ForEach(Course.allCases) { course in
                             Text(course.rawValue).tag(course)
@@ -34,8 +45,8 @@ struct BaseTimesView: View {
                         } label: {
                             BaseTimeRow(
                                 event: event,
-                                seconds: store.baseSeconds(for: event),
-                                isCustom: store.hasCustomBaseTime(for: event)
+                                seconds: store.baseSeconds(for: event, gender: gender),
+                                isCustom: store.hasCustomBaseTime(for: event, gender: gender)
                             )
                         }
                         .buttonStyle(.plain)
@@ -65,7 +76,13 @@ struct BaseTimesView: View {
                 Button("Cancel", role: .cancel) {}
             }
             .sheet(item: $editingEvent) { event in
-                BaseTimeEditorSheet(event: event)
+                BaseTimeEditorSheet(event: event, gender: gender)
+            }
+            .onAppear {
+                guard !didApplyDefaults else { return }
+                gender = store.settings.gender
+                courseFilter = store.settings.defaultCourse
+                didApplyDefaults = true
             }
         }
     }
@@ -105,13 +122,15 @@ private struct BaseTimeEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let event: SwimEvent
+    let gender: Gender
 
     @State private var minutes: Int
     @State private var seconds: Int
     @State private var hundredths: Int
 
-    init(event: SwimEvent) {
+    init(event: SwimEvent, gender: Gender) {
         self.event = event
+        self.gender = gender
         // Placeholder; real values set in onAppear via store.
         _minutes = State(initialValue: 0)
         _seconds = State(initialValue: 0)
@@ -123,13 +142,14 @@ private struct BaseTimeEditorSheet: View {
     }
 
     private var factoryDefault: Double? {
-        BaseTimes.defaultSeconds(for: event)
+        BaseTimes.defaultSeconds(for: event, gender: gender)
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
+                    LabeledContent("Gender", value: gender.rawValue)
                     LabeledContent("Event", value: event.titleWithCourse)
                     if let factoryDefault {
                         LabeledContent("App default", value: factoryDefault.asSwimTime)
@@ -149,10 +169,10 @@ private struct BaseTimeEditorSheet: View {
                     .monospacedDigit()
                 }
 
-                if store.hasCustomBaseTime(for: event) {
+                if store.hasCustomBaseTime(for: event, gender: gender) {
                     Section {
                         Button("Revert to app default") {
-                            store.clearBaseTimeOverride(for: event)
+                            store.clearBaseTimeOverride(for: event, gender: gender)
                             dismiss()
                         }
                     }
@@ -166,14 +186,14 @@ private struct BaseTimeEditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        store.setBaseTime(for: event, seconds: totalSeconds)
+                        store.setBaseTime(for: event, gender: gender, seconds: totalSeconds)
                         dismiss()
                     }
                     .disabled(totalSeconds <= 0)
                 }
             }
             .onAppear {
-                let seed = store.baseSeconds(for: event) ?? factoryDefault ?? 0
+                let seed = store.baseSeconds(for: event, gender: gender) ?? factoryDefault ?? 0
                 let components = seed.swimTimeComponents
                 minutes = components.minutes
                 seconds = components.seconds

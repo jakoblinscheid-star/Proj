@@ -3,6 +3,8 @@ import SwiftUI
 /// Course conversion tab: SCY ↔ SCM ↔ LCM using Colorado Timing factors
 /// (same model as SwimSwam's classic converter).
 struct ConvertView: View {
+    @Environment(Store.self) private var store
+
     @State private var event: ConverterEvent = ConverterEvent.catalog.first {
         $0.stroke == .freestyle && $0.meterDistance == 100
     } ?? ConverterEvent.catalog[0]
@@ -11,6 +13,7 @@ struct ConvertView: View {
     @State private var minutes = 0
     @State private var seconds = 0
     @State private var hundredths = 0
+    @State private var didApplyDefaults = false
 
     private var inputSeconds: Double {
         Double(minutes * 60 + seconds) + Double(hundredths) / 100.0
@@ -107,6 +110,12 @@ struct ConvertView: View {
                 }
             }
             .navigationTitle("Convert")
+            .onAppear {
+                guard !didApplyDefaults else { return }
+                fromCourse = store.settings.defaultCourse
+                toCourse = store.settings.defaultCourse == .lcm ? .scy : .lcm
+                didApplyDefaults = true
+            }
         }
     }
 
@@ -119,5 +128,6 @@ struct ConvertView: View {
 
 #Preview {
     ConvertView()
+        .environment(Store())
         .tint(Theme.accent)
 }

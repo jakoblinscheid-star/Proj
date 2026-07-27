@@ -3,6 +3,7 @@ import SwiftUI
 /// Landing tab: a friendly header plus your most recent meets.
 struct HomeView: View {
     @Environment(Store.self) private var store
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
@@ -14,6 +15,18 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("SwimTracker")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
             .navigationDestination(for: Meet.self) { meet in
                 MeetDetailView(meetID: meet.id)
             }

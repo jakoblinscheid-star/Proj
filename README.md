@@ -44,14 +44,14 @@ Do this once in Xcode before automating, to prove the signing chain works:
 Edit the CONFIG block at the top of `mac/resign_and_install.sh`:
 
 - `PROJECT` — absolute path to your `.xcodeproj` or `.xcworkspace` (pre-filled with
-  `$HOME/Proj/TabTrackApp/TabTrack.xcodeproj`; fix the prefix to match where the repo
+  `$HOME/Proj/SwimTracker/SwimTracker.xcodeproj`; fix the prefix to match where the repo
   lives on your Mac)
-- `SCHEME` — your shared scheme name (pre-filled with `TabTrack`)
+- `SCHEME` — your shared scheme name (pre-filled with `SwimTracker`)
 - `TEAM_ID` — your 10-char Team ID (also set it in `ExportOptions.plist`)
 - `DEVICE_UDID` — your iPhone UDID (or leave `""` to auto-pick the first connected device)
 
-> The app being signed here is the native **TabTrack** iOS app in
-> [`TabTrackApp/`](TabTrackApp/). See its [README](TabTrackApp/README.md) for how to
+> The app being signed here is the native **SwimTracker** iOS app in
+> [`SwimTracker/`](SwimTracker/). See its [README](SwimTracker/README.md) for how to
 > build and first-install it in Xcode (including setting a unique Bundle Identifier).
 
 Then verify it end-to-end, bypassing the time guard:

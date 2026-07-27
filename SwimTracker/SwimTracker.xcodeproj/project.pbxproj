@@ -20,6 +20,14 @@
 		3B000000000000000000000C /* BaseTimesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000C /* BaseTimesView.swift */; };
 		3B000000000000000000000D /* CourseConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000D /* CourseConverter.swift */; };
 		3B000000000000000000000E /* ConvertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000E /* ConvertView.swift */; };
+		3B000000000000000000000F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000000F /* SettingsView.swift */; };
+		3B0000000000000000000010 /* SwimTimeWheels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000010 /* SwimTimeWheels.swift */; };
+		3B0000000000000000000011 /* SwimBadges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000011 /* SwimBadges.swift */; };
+		3B0000000000000000000012 /* AddTimeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000012 /* AddTimeView.swift */; };
+		3B0000000000000000000013 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000013 /* EventDetailView.swift */; };
+		3B0000000000000000000014 /* MeetEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000014 /* MeetEditView.swift */; };
+		3B0000000000000000000015 /* MeetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000015 /* MeetDetailView.swift */; };
+		3B0000000000000000000016 /* ResultEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000016 /* ResultEntryView.swift */; };
 		3B0000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000009 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -38,6 +46,14 @@
 		2B000000000000000000000C /* BaseTimesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseTimesView.swift; sourceTree = "<group>"; };
 		2B000000000000000000000D /* CourseConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseConverter.swift; sourceTree = "<group>"; };
 		2B000000000000000000000E /* ConvertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertView.swift; sourceTree = "<group>"; };
+		2B000000000000000000000F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000010 /* SwimTimeWheels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwimTimeWheels.swift; sourceTree = "<group>"; };
+		2B0000000000000000000011 /* SwimBadges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwimBadges.swift; sourceTree = "<group>"; };
+		2B0000000000000000000012 /* AddTimeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTimeView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000013 /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000014 /* MeetEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetEditView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000015 /* MeetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetDetailView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000016 /* ResultEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultEntryView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -84,6 +100,14 @@
 				2B000000000000000000000C /* BaseTimesView.swift */,
 				2B000000000000000000000D /* CourseConverter.swift */,
 				2B000000000000000000000E /* ConvertView.swift */,
+				2B000000000000000000000F /* SettingsView.swift */,
+				2B0000000000000000000010 /* SwimTimeWheels.swift */,
+				2B0000000000000000000011 /* SwimBadges.swift */,
+				2B0000000000000000000012 /* AddTimeView.swift */,
+				2B0000000000000000000013 /* EventDetailView.swift */,
+				2B0000000000000000000014 /* MeetEditView.swift */,
+				2B0000000000000000000015 /* MeetDetailView.swift */,
+				2B0000000000000000000016 /* ResultEntryView.swift */,
 				2B0000000000000000000009 /* Assets.xcassets */,
 			);
 			path = SwimTracker;
@@ -171,6 +195,14 @@
 				3B000000000000000000000C /* BaseTimesView.swift in Sources */,
 				3B000000000000000000000D /* CourseConverter.swift in Sources */,
 				3B000000000000000000000E /* ConvertView.swift in Sources */,
+				3B000000000000000000000F /* SettingsView.swift in Sources */,
+				3B0000000000000000000010 /* SwimTimeWheels.swift in Sources */,
+				3B0000000000000000000011 /* SwimBadges.swift in Sources */,
+				3B0000000000000000000012 /* AddTimeView.swift in Sources */,
+				3B0000000000000000000013 /* EventDetailView.swift in Sources */,
+				3B0000000000000000000014 /* MeetEditView.swift in Sources */,
+				3B0000000000000000000015 /* MeetDetailView.swift in Sources */,
+				3B0000000000000000000016 /* ResultEntryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
