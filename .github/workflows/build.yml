@@ -1,0 +1,39 @@
+name: Build unsigned iOS app
+
+on:
+  workflow_dispatch:        # manual "Run workflow" button
+  push:
+    branches: [ main ]      # optional: also build on every push to main
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build unsigned .app
+        run: |
+          xcodebuild \
+            -project SwimTracker/SwimTracker.xcodeproj \
+            -scheme SwimTracker \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package into unsigned .ipa
+        run: |
+          cd build/Build/Products/Release-iphoneos
+          mkdir Payload
+          mv *.app Payload/
+          zip -r SwimTracker-unsigned.ipa Payload
+          mv SwimTracker-unsigned.ipa "$GITHUB_WORKSPACE/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwimTracker-unsigned
+          path: SwimTracker-unsigned.ipa
