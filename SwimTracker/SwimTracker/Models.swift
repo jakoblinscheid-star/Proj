@@ -373,6 +373,91 @@ enum SwimSplits {
     static func normalized(_ splits: [Double], distance: Int, isRelay: Bool = false) -> [Double] {
         isComplete(splits, distance: distance, isRelay: isRelay) ? splits : []
     }
+
+    /// Opening cumulative splits that can score as shorter events of the same stroke
+    /// (Swimcloud-style extracted splits). Example: first 50 of a 100 Free → 50 Free;
+    /// first 100 of a 200 Free → 100 Free. Mid-race flying segments are not included.
+    static func openingCandidates(from time: SwimTime) -> [(event: SwimEvent, seconds: Double)] {
+        guard !time.isRelay,
+              isComplete(time.splits, distance: time.distance, isRelay: false)
+        else { return [] }
+
+        var result: [(event: SwimEvent, seconds: Double)] = []
+        var cumulative = 0.0
+        for (index, split) in time.splits.enumerated() {
+            cumulative += split
+            let distance = (index + 1) * 50
+            guard distance < time.distance else { break }
+            let event = SwimEvent(distance: distance, stroke: time.stroke, course: time.course)
+            result.append((event: event, seconds: cumulative))
+        }
+        return result
+    }
+}
+
+/// A clocked performance for an event: either the race itself or an opening split
+/// pulled from a longer race. Extracted performances are not stored separately —
+/// they always point back at the parent `SwimTime`.
+struct EventPerformance: Identifiable, Hashable {
+    let id: String
+    let event: SwimEvent
+    let seconds: Double
+    let date: Date
+    let meetID: String?
+    let round: MeetRound?
+    /// The recorded swim this came from (the race itself, or the longer parent race).
+    let source: SwimTime
+    let isExtracted: Bool
+
+    /// Label for UI when this is an opening split, e.g. "From 100 Breast".
+    var extractedFromLabel: String? {
+        guard isExtracted else { return nil }
+        return "From \(source.event.name)"
+    }
+
+    static func official(_ time: SwimTime) -> EventPerformance? {
+        guard !time.isRelay, let seconds = time.seconds else { return nil }
+        return EventPerformance(
+            id: time.id,
+            event: time.event,
+            seconds: seconds,
+            date: time.date,
+            meetID: time.meetID,
+            round: time.round,
+            source: time,
+            isExtracted: false
+        )
+    }
+
+    static func extracted(from time: SwimTime, event: SwimEvent, seconds: Double) -> EventPerformance {
+        EventPerformance(
+            id: "\(time.id)|extract|\(event.id)",
+            event: event,
+            seconds: seconds,
+            date: time.date,
+            meetID: time.meetID,
+            round: time.round,
+            source: time,
+            isExtracted: true
+        )
+    }
+
+    /// SwimTime-shaped view for APIs that only need seconds/date/meet (goals, widgets).
+    /// Not for editing — use `source` when mutating.
+    var asSwimTime: SwimTime {
+        SwimTime(
+            id: id,
+            distance: event.distance,
+            stroke: event.stroke,
+            course: event.course,
+            seconds: seconds,
+            splits: [],
+            date: date,
+            meetID: meetID,
+            note: extractedFromLabel ?? source.note,
+            round: round
+        )
+    }
 }
 
 // MARK: - Scoring (World Aquatics points)
@@ -413,6 +498,7 @@ struct ScoreComponent: Identifiable, Hashable {
 /// A weighted overall built from a swimmer's best events, Swimcloud-style: a
 /// weighted average of the top events (0.4 / 0.4 / 0.15 / 0.05), renormalised
 /// when fewer than four events exist so one event equals its own score.
+/// Opening splits from longer races compete as shorter events of the same stroke.
 struct OverallScore: Hashable {
     let value: Int
     /// The events that fed the overall, best-scoring first.
@@ -657,10 +743,23 @@ final class Store {
     // MARK: Times
 
     /// Distinct individual events the swimmer has an actual time for, in heat-sheet
-    /// order. Relays and not-yet-timed entries are excluded from the Times tab.
+    /// order. Includes shorter events reached only via opening splits. Relays and
+    /// not-yet-timed entries are excluded from the Times tab.
     var eventsWithTimes: [SwimEvent] {
-        let recorded = times.filter { !$0.isRelay && $0.seconds != nil }
-        return Array(Set(recorded.map { $0.event })).sorted(by: <)
+        var events = Set<SwimEvent>()
+        for time in times where !time.isRelay {
+            if time.seconds != nil { events.insert(time.event) }
+            for candidate in SwimSplits.openingCandidates(from: time)
+            where isCatalogEvent(candidate.event) {
+                events.insert(candidate.event)
+            }
+        }
+        return Array(events).sorted(by: <)
+    }
+
+    /// True when the event appears in the standard individual catalog for its course.
+    private func isCatalogEvent(_ event: SwimEvent) -> Bool {
+        BaseTimes.events(for: event.course).contains(event)
     }
 
     /// All times for an event, oldest first.
@@ -668,25 +767,44 @@ final class Store {
         times.filter { $0.event == event }.sorted { $0.date < $1.date }
     }
 
-    /// Times for an event that have an actual clocked time, oldest first.
+    /// Official (non-extracted) timed swims for an event, oldest first.
     func recordedTimes(for event: SwimEvent) -> [SwimTime] {
         times(for: event).filter { $0.seconds != nil }
     }
 
-    /// The fastest recorded time for an event.
-    func bestTime(for event: SwimEvent) -> SwimTime? {
-        recordedTimes(for: event).min {
-            ($0.seconds ?? .greatestFiniteMagnitude) < ($1.seconds ?? .greatestFiniteMagnitude)
+    /// Official races plus opening splits that count for this event, oldest first.
+    func performances(for event: SwimEvent) -> [EventPerformance] {
+        var result: [EventPerformance] = []
+        for time in times where !time.isRelay {
+            if time.event == event, let official = EventPerformance.official(time) {
+                result.append(official)
+            }
+            for candidate in SwimSplits.openingCandidates(from: time)
+            where candidate.event == event && isCatalogEvent(candidate.event) {
+                result.append(.extracted(from: time, event: candidate.event, seconds: candidate.seconds))
+            }
         }
+        return result.sorted { $0.date < $1.date }
     }
 
-    /// Fastest recorded time for an event in the current Aug–Jul season.
+    /// Fastest performance for an event (official race or extracted opening split).
+    func bestPerformance(for event: SwimEvent) -> EventPerformance? {
+        performances(for: event).min { $0.seconds < $1.seconds }
+    }
+
+    /// The fastest time for an event, including opening splits from longer races.
+    /// For extracted bests the returned value is a display-only SwimTime — edit via
+    /// `bestPerformance(for:).source` instead.
+    func bestTime(for event: SwimEvent) -> SwimTime? {
+        bestPerformance(for: event)?.asSwimTime
+    }
+
+    /// Fastest time for an event in the current Aug–Jul season (includes extracts).
     func bestTimeInCurrentSeason(for event: SwimEvent) -> SwimTime? {
-        recordedTimes(for: event)
+        performances(for: event)
             .filter { SwimSeason.contains($0.date) }
-            .min {
-                ($0.seconds ?? .greatestFiniteMagnitude) < ($1.seconds ?? .greatestFiniteMagnitude)
-            }
+            .min { $0.seconds < $1.seconds }?
+            .asSwimTime
     }
 
     // MARK: Goals
@@ -782,10 +900,17 @@ final class Store {
         baseTimeOverrides = [:]
     }
 
-    /// Points for the fastest time in an event (the swimmer's best score there).
+    /// Points for the fastest time in an event (the swimmer's best score there),
+    /// including opening splits from longer races.
     func bestScore(for event: SwimEvent) -> Int? {
-        guard let best = bestTime(for: event) else { return nil }
+        guard let best = bestPerformance(for: event) else { return nil }
         return score(for: best)
+    }
+
+    /// World Aquatics points for a performance (official or extracted).
+    func score(for performance: EventPerformance) -> Int? {
+        guard let base = baseSeconds(for: performance.event) else { return nil }
+        return SwimScore.points(seconds: performance.seconds, base: base)
     }
 
     /// Resolved meet name for a recorded time, if it references a meet.
@@ -805,13 +930,26 @@ final class Store {
     static let overallWeights: [Double] = [0.4, 0.4, 0.15, 0.05]
 
     /// Builds a weighted overall from a set of times: the best score per individual
-    /// event, then the top four events combined as a renormalised weighted average.
+    /// event (including opening splits extracted from longer races), then the top
+    /// four events combined as a renormalised weighted average.
     func overallScore(for source: [SwimTime]) -> OverallScore {
         var bestByEvent: [SwimEvent: Int] = [:]
-        for time in source where !time.isRelay && time.seconds != nil {
-            guard let points = score(for: time) else { continue }
-            if let existing = bestByEvent[time.event], existing >= points { continue }
-            bestByEvent[time.event] = points
+
+        func consider(event: SwimEvent, points: Int) {
+            if let existing = bestByEvent[event], existing >= points { return }
+            bestByEvent[event] = points
+        }
+
+        for time in source where !time.isRelay {
+            if let points = score(for: time) {
+                consider(event: time.event, points: points)
+            }
+            for candidate in SwimSplits.openingCandidates(from: time) {
+                guard let base = baseSeconds(for: candidate.event),
+                      let points = SwimScore.points(seconds: candidate.seconds, base: base)
+                else { continue }
+                consider(event: candidate.event, points: points)
+            }
         }
 
         let ranked = bestByEvent.sorted { $0.value > $1.value }

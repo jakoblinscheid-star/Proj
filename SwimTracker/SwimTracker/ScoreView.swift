@@ -293,7 +293,7 @@ struct ScoreView: View {
             } header: {
                 Text("Top events")
             } footer: {
-                Text("Your best four events, weighted 40% / 40% / 15% / 5% (renormalised when you have fewer).")
+                Text("Your best four events, weighted 40% / 40% / 15% / 5% (renormalised when you have fewer). Opening splits from longer races count toward shorter events.")
             }
         }
     }

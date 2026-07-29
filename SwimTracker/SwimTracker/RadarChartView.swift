@@ -82,12 +82,6 @@ struct StrokeRadarChart: View {
             fill.closeSubpath()
             context.fill(fill, with: .color(Theme.accent.opacity(0.28)))
             context.stroke(fill, with: .color(Theme.accent), lineWidth: 2.5)
-
-            for point in points {
-                let dot = Path(ellipseIn: CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8))
-                context.fill(dot, with: .color(Theme.accent))
-                context.stroke(dot, with: .color(.white.opacity(0.85)), lineWidth: 1.5)
-            }
         }
     }
 

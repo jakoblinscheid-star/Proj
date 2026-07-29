@@ -79,7 +79,7 @@ struct TimesView: View {
                         eventLink(event)
                     }
                 } footer: {
-                    Text("World Aquatics points (\(store.settings.gender.rawValue.lowercased())), best time per event. All-time goals shown under each best.")
+                    Text("World Aquatics points (\(store.settings.gender.rawValue.lowercased())), best time per event — including opening splits from longer races. All-time goals shown under each best.")
                 }
             case .event:
                 ForEach(coursesToShow) { course in
@@ -174,8 +174,8 @@ struct BestTimeRowView: View {
     @Environment(Store.self) private var store
     let event: SwimEvent
 
-    private var best: SwimTime? { store.bestTime(for: event) }
-    private var count: Int { store.recordedTimes(for: event).count }
+    private var best: EventPerformance? { store.bestPerformance(for: event) }
+    private var count: Int { store.performances(for: event).count }
     private var allTimeGoal: Double? { store.goals(for: event)?.allTimeSeconds }
 
     var body: some View {
@@ -193,8 +193,8 @@ struct BestTimeRowView: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 4) {
-                if let seconds = best?.seconds {
-                    Text(seconds.asSwimTime)
+                if let best {
+                    Text(best.seconds.asSwimTime)
                         .font(.headline)
                         .monospacedDigit()
                     if let allTimeGoal {
