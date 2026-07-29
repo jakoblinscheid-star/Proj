@@ -41,30 +41,18 @@ struct StrokeRadarChart: View {
     // MARK: - Drawing
 
     private func grid(center: CGPoint, radius: CGFloat) -> some View {
-        ZStack {
-            Canvas { context, _ in
-                for ring in 1...ringCount {
-                    var path = Path()
-                    for i in 0..<scores.count {
-                        let point = polarPoint(index: i,
-                                               value: maxValue * Double(ring) / Double(ringCount),
-                                               center: center,
-                                               radius: radius)
-                        if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
-                    }
-                    path.closeSubpath()
-                    context.stroke(path, with: .color(Color.secondary.opacity(0.35)), lineWidth: 1)
+        Canvas { context, _ in
+            for ring in 1...ringCount {
+                var path = Path()
+                for i in 0..<scores.count {
+                    let point = polarPoint(index: i,
+                                           value: maxValue * Double(ring) / Double(ringCount),
+                                           center: center,
+                                           radius: radius)
+                    if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
                 }
-            }
-
-            // Scale labels along the top (first) axis.
-            ForEach(1...ringCount, id: \.self) { ring in
-                let value = maxValue * Double(ring) / Double(ringCount)
-                let tip = polarPoint(index: 0, value: value, center: center, radius: radius)
-                Text("\(Int(value))")
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .position(x: tip.x + 14, y: tip.y)
+                path.closeSubpath()
+                context.stroke(path, with: .color(Color.secondary.opacity(0.35)), lineWidth: 1)
             }
         }
     }
