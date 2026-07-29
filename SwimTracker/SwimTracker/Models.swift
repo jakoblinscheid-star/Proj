@@ -862,12 +862,87 @@ final class Store {
         guard let data = try? JSONEncoder.swimTracker.encode(settings) else { return }
         try? data.write(to: settingsURL, options: [.atomic])
     }
+
+    // MARK: Backup (import / export)
+
+    /// Bundles meets, times, base-time overrides, and settings into one JSON file.
+    func exportBackup() throws -> Data {
+        let backup = SwimTrackerBackup(
+            formatVersion: SwimTrackerBackup.currentFormatVersion,
+            exportedAt: Date(),
+            meets: meets,
+            times: times,
+            baseTimeOverrides: baseTimeOverrides,
+            settings: settings
+        )
+        return try JSONEncoder.swimTrackerPretty.encode(backup)
+    }
+
+    /// Suggested filename for a newly exported backup, e.g. `SwimTracker-Backup-2026-07-29.json`.
+    var backupExportFilename: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return "SwimTracker-Backup-\(formatter.string(from: Date())).json"
+    }
+
+    /// Replaces all on-device data with the contents of a backup file.
+    func importBackup(from data: Data) throws {
+        let backup = try JSONDecoder.swimTracker.decode(SwimTrackerBackup.self, from: data)
+        guard backup.formatVersion == SwimTrackerBackup.currentFormatVersion else {
+            throw BackupError.unsupportedVersion(backup.formatVersion)
+        }
+
+        isLoading = true
+        meets = backup.meets
+        times = backup.times
+        baseTimeOverrides = backup.baseTimeOverrides
+        settings = backup.settings
+        isLoading = false
+
+        saveMeets()
+        saveTimes()
+        saveBaseTimes()
+        saveSettings()
+    }
+}
+
+/// Single-file backup of everything SwimTracker stores locally.
+struct SwimTrackerBackup: Codable {
+    static let currentFormatVersion = 1
+
+    var formatVersion: Int
+    var exportedAt: Date
+    var meets: [Meet]
+    var times: [SwimTime]
+    var baseTimeOverrides: [String: Double]
+    var settings: AppSettings
+}
+
+enum BackupError: LocalizedError {
+    case unsupportedVersion(Int)
+    case unreadableFile
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedVersion(let version):
+            return "This backup format (v\(version)) is not supported by this version of SwimTracker."
+        case .unreadableFile:
+            return "Could not read that file. Choose a SwimTracker backup JSON export."
+        }
+    }
 }
 
 private extension JSONEncoder {
     static let swimTracker: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    static let swimTrackerPretty: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return encoder
     }()
 }
