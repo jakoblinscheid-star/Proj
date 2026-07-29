@@ -33,11 +33,14 @@ struct MeetDetailView: View {
             }
         }
         .sheet(isPresented: $showingEventEntry) {
-            ResultEntryView(
-                draft: editingDraft,
-                defaultCourse: store.settings.defaultCourse
-            ) { event, seconds, note, splits in
-                applyResult(event: event, seconds: seconds, note: note, splits: splits)
+            NavigationStack {
+                ResultEntryView(
+                    draft: editingDraft,
+                    fixedCourse: meet?.course,
+                    defaultCourse: meet?.course ?? store.settings.defaultCourse
+                ) { draft in
+                    applyResult(draft)
+                }
             }
         }
     }
@@ -54,7 +57,10 @@ struct MeetDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                Label(meet.date.asShortDate, systemImage: "calendar")
+                Label(meet.dateRangeLabel, systemImage: "calendar")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Label(meet.course.label, systemImage: "ruler")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -94,24 +100,39 @@ struct MeetDetailView: View {
 
     private var editingDraft: ResultDraft? {
         guard let editingResultID, let result = results.first(where: { $0.id == editingResultID }) else { return nil }
-        return ResultDraft(event: result.event, seconds: result.seconds, note: result.note, splits: result.splits)
+        return ResultDraft(
+            event: result.event,
+            seconds: result.seconds,
+            note: result.note,
+            splits: result.splits,
+            relayLeg: result.relayLeg,
+            relayLegStroke: result.relayLegStroke,
+            relayLegSeconds: result.relayLegSeconds,
+            isRelayLeadOff: result.isRelayLeadOff
+        )
     }
 
-    private func applyResult(event: SwimEvent, seconds: Double?, note: String, splits: [Double]) {
+    private func applyResult(_ draft: ResultDraft) {
         if let editingResultID,
            let existing = results.first(where: { $0.id == editingResultID }) {
-            store.updateTime(id: editingResultID,
-                             distance: event.distance,
-                             stroke: event.stroke,
-                             course: event.course,
-                             seconds: seconds,
-                             date: existing.date,
-                             meetID: meetID,
-                             isRelay: event.isRelay,
-                             note: note,
-                             splits: splits)
+            store.updateTime(
+                id: editingResultID,
+                distance: draft.event.distance,
+                stroke: draft.event.stroke,
+                course: meet?.course ?? draft.event.course,
+                seconds: draft.seconds,
+                date: existing.date,
+                meetID: meetID,
+                isRelay: draft.event.isRelay,
+                note: draft.note,
+                splits: draft.splits,
+                relayLeg: draft.relayLeg,
+                relayLegStroke: draft.relayLegStroke,
+                relayLegSeconds: draft.relayLegSeconds,
+                isRelayLeadOff: draft.isRelayLeadOff
+            )
         } else {
-            store.addResult(toMeet: meetID, event: event, seconds: seconds, note: note, splits: splits)
+            store.addResult(toMeet: meetID, draft: draft)
         }
     }
 
@@ -134,7 +155,7 @@ struct ResultRow: View {
                 Text(result.event.name)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                Text(result.event.course.rawValue + (result.isRelay ? " · Relay" : ""))
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !result.note.isEmpty {
@@ -165,11 +186,34 @@ struct ResultRow: View {
                         .font(.subheadline)
                         .foregroundStyle(Theme.accent)
                 }
+                if let leg = result.relayLegSeconds {
+                    Text("Leg \(leg.asSwimTime)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
                 if let score = store.score(for: result) {
                     ScoreBadge(points: score)
                 }
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var subtitle: String {
+        var parts = [result.event.course.rawValue]
+        if result.isRelay {
+            parts.append("Relay")
+            if let leg = result.relayLeg {
+                parts.append("Leg \(leg)")
+            }
+            if result.event.stroke == .medley, let stroke = result.relayLegStroke {
+                parts.append(stroke.rawValue)
+            }
+            if result.isRelayLeadOff {
+                parts.append("Lead-off")
+            }
+        }
+        return parts.joined(separator: " · ")
     }
 }

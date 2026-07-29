@@ -54,7 +54,7 @@ extension Double {
         return String(format: "%d.%02d", seconds, fraction)
     }
 
-    /// Split into (minutes, seconds, hundredths) for the wheel time editors.
+    /// Split into (minutes, seconds, hundredths) for editors that still want components.
     var swimTimeComponents: (minutes: Int, seconds: Int, hundredths: Int) {
         let total = Int((self * 100).rounded())
         return (total / 6000, (total % 6000) / 100, total % 100)

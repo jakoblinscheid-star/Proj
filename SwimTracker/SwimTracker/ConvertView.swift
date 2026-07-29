@@ -10,14 +10,10 @@ struct ConvertView: View {
     } ?? ConverterEvent.catalog[0]
     @State private var fromCourse: Course = .scy
     @State private var toCourse: Course = .lcm
-    @State private var minutes = 0
-    @State private var seconds = 0
-    @State private var hundredths = 0
+    @State private var timeSeconds = 0.0
     @State private var didApplyDefaults = false
 
-    private var inputSeconds: Double {
-        Double(minutes * 60 + seconds) + Double(hundredths) / 100.0
-    }
+    private var inputSeconds: Double { timeSeconds }
 
     private var convertedSeconds: Double? {
         guard fromCourse != toCourse else { return inputSeconds > 0 ? inputSeconds : nil }
@@ -76,7 +72,7 @@ struct ConvertView: View {
                 }
 
                 Section {
-                    SwimTimeWheels(minutes: $minutes, seconds: $seconds, hundredths: $hundredths)
+                    SwimTimePad(seconds: $timeSeconds)
                 } header: {
                     Text("Time · \(fromCourse.rawValue) · \(fromDistanceLabel)")
                 }

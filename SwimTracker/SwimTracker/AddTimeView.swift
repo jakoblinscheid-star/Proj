@@ -11,9 +11,7 @@ struct AddTimeView: View {
     @State private var course: Course
     @State private var stroke: Stroke
     @State private var distance: Int
-    @State private var minutes = 0
-    @State private var seconds = 0
-    @State private var hundredths = 0
+    @State private var timeSeconds: Double
     @State private var splitValues: [Double]
     @State private var date = Date()
     @State private var meetID: String? = nil
@@ -28,10 +26,7 @@ struct AddTimeView: View {
         _course = State(initialValue: event?.course ?? defaultCourse)
         _stroke = State(initialValue: event?.stroke ?? .freestyle)
         _distance = State(initialValue: initialDistance)
-        let components = (editing?.seconds ?? 0).swimTimeComponents
-        _minutes = State(initialValue: components.minutes)
-        _seconds = State(initialValue: components.seconds)
-        _hundredths = State(initialValue: components.hundredths)
+        _timeSeconds = State(initialValue: editing?.seconds ?? 0)
         let expected = SwimSplits.fiftyCount(distance: initialDistance, isRelay: initialRelay)
         var initialSplits = editing?.splits ?? []
         if expected >= 2 {
@@ -60,26 +55,22 @@ struct AddTimeView: View {
             .map { $0.distance }
     }
 
-    private var totalSeconds: Double {
-        Double(minutes) * 60 + Double(seconds) + Double(hundredths) / 100.0
-    }
-
     private var previewScore: Int? {
         store.baseSeconds(for: SwimEvent(distance: distance, stroke: stroke, course: course))
-            .flatMap { SwimScore.points(seconds: totalSeconds, base: $0) }
+            .flatMap { SwimScore.points(seconds: timeSeconds, base: $0) }
     }
 
     private var canSave: Bool {
-        totalSeconds > 0 && availableDistances.contains(distance)
+        timeSeconds > 0 && availableDistances.contains(distance)
     }
 
     private var splitsMismatchFinal: Bool {
         let expected = SwimSplits.fiftyCount(distance: distance, isRelay: false)
         let values = Array(splitValues.prefix(expected))
-        guard totalSeconds > 0,
+        guard timeSeconds > 0,
               SwimSplits.isComplete(values, distance: distance, isRelay: false) else { return false }
         let total = values.reduce(0, +)
-        return abs(total - totalSeconds) >= 0.005
+        return abs(total - timeSeconds) >= 0.005
     }
 
     var body: some View {
@@ -92,8 +83,8 @@ struct AddTimeView: View {
                     unit: course.unit,
                     isRelay: false,
                     splits: $splitValues,
-                    finalSeconds: totalSeconds,
-                    onUseSplitTotal: applyFinalTime
+                    finalSeconds: timeSeconds,
+                    onUseSplitTotal: { timeSeconds = $0 }
                 )
                 detailsSection
                 if editingID != nil {
@@ -123,6 +114,12 @@ struct AddTimeView: View {
             }
             .onChange(of: course) { _, _ in reconcileEventSelection() }
             .onChange(of: stroke) { _, _ in reconcileEventSelection() }
+            .onChange(of: meetID) { _, newMeetID in
+                if let newMeetID, let meet = store.meet(id: newMeetID) {
+                    course = meet.course
+                    date = meet.date
+                }
+            }
         }
     }
 
@@ -134,6 +131,7 @@ struct AddTimeView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .disabled(meetID != nil)
 
             Picker("Stroke", selection: $stroke) {
                 ForEach(availableStrokes) { stroke in
@@ -151,19 +149,19 @@ struct AddTimeView: View {
 
     private var timeSection: some View {
         Section {
-            SwimTimeWheels(minutes: $minutes, seconds: $seconds, hundredths: $hundredths)
+            SwimTimePad(seconds: $timeSeconds)
         } header: {
             Text("Time")
         } footer: {
             HStack {
-                Text(totalSeconds > 0 ? totalSeconds.asSwimTime : "—")
+                Text(timeSeconds > 0 ? timeSeconds.asSwimTime : "—")
                     .monospacedDigit()
                 Spacer()
                 if splitsMismatchFinal {
                     Text("Splits don’t add up")
                 } else if let previewScore {
                     Text("\(previewScore) World Aquatics pts")
-                } else if totalSeconds > 0 {
+                } else if timeSeconds > 0 {
                     Text("No score for this event")
                 } else {
                     Text("Enter a time")
@@ -198,25 +196,20 @@ struct AddTimeView: View {
         }
     }
 
-    private func applyFinalTime(_ value: Double) {
-        let components = value.swimTimeComponents
-        minutes = components.minutes
-        seconds = components.seconds
-        hundredths = components.hundredths
-    }
-
     private func save() {
         guard canSave else { return }
         var swimDate = date
+        var swimCourse = course
         if let meetID, let meet = store.meet(id: meetID) {
             swimDate = meet.date
+            swimCourse = meet.course
         }
         if let editingID {
             store.updateTime(id: editingID,
                              distance: distance,
                              stroke: stroke,
-                             course: course,
-                             seconds: totalSeconds,
+                             course: swimCourse,
+                             seconds: timeSeconds,
                              date: swimDate,
                              meetID: meetID,
                              isRelay: false,
@@ -225,8 +218,8 @@ struct AddTimeView: View {
         } else {
             store.addTime(distance: distance,
                           stroke: stroke,
-                          course: course,
-                          seconds: totalSeconds,
+                          course: swimCourse,
+                          seconds: timeSeconds,
                           date: swimDate,
                           meetID: meetID,
                           note: note,

@@ -7,36 +7,42 @@ struct ResultEntryView: View {
 
     /// Pass an existing draft to edit it; leave nil to add a new one.
     let draft: ResultDraft?
-    let onSave: (SwimEvent, Double?, String, [Double]) -> Void
+    /// When set (meet results), course is locked to the meet and cannot be changed.
+    let fixedCourse: Course?
+    let defaultCourse: Course
+    let onSave: (ResultDraft) -> Void
 
     @State private var isRelay: Bool
     @State private var course: Course
     @State private var stroke: Stroke
     @State private var distance: Int
-    @State private var minutes: Int
-    @State private var seconds: Int
-    @State private var hundredths: Int
+    @State private var timeSeconds: Double
     @State private var splitValues: [Double]
     @State private var note: String
+    @State private var relayLeg: Int
+    @State private var relayLegStroke: Stroke
+    @State private var relayLegSeconds: Double
+    @State private var isRelayLeadOff: Bool
 
     init(
         draft: ResultDraft?,
+        fixedCourse: Course? = nil,
         defaultCourse: Course = .scy,
-        onSave: @escaping (SwimEvent, Double?, String, [Double]) -> Void
+        onSave: @escaping (ResultDraft) -> Void
     ) {
         self.draft = draft
+        self.fixedCourse = fixedCourse
+        self.defaultCourse = defaultCourse
         self.onSave = onSave
         let event = draft?.event
         let initialDistance = event?.distance ?? 100
         let initialRelay = event?.isRelay ?? false
+        let initialCourse = fixedCourse ?? event?.course ?? defaultCourse
         _isRelay = State(initialValue: initialRelay)
-        _course = State(initialValue: event?.course ?? defaultCourse)
+        _course = State(initialValue: initialCourse)
         _stroke = State(initialValue: event?.stroke ?? .freestyle)
         _distance = State(initialValue: initialDistance)
-        let components = (draft?.seconds ?? 0).swimTimeComponents
-        _minutes = State(initialValue: components.minutes)
-        _seconds = State(initialValue: components.seconds)
-        _hundredths = State(initialValue: components.hundredths)
+        _timeSeconds = State(initialValue: draft?.seconds ?? 0)
         let expected = SwimSplits.fiftyCount(distance: initialDistance, isRelay: initialRelay)
         var initialSplits = draft?.splits ?? []
         if expected >= 2 {
@@ -50,6 +56,14 @@ struct ResultEntryView: View {
         }
         _splitValues = State(initialValue: initialSplits)
         _note = State(initialValue: draft?.note ?? "")
+        let leg = draft?.relayLeg ?? 1
+        _relayLeg = State(initialValue: leg)
+        let defaultLegStroke = event?.stroke == .medley
+            ? RelayLegInfo.defaultMedleyStroke(forLeg: leg)
+            : .freestyle
+        _relayLegStroke = State(initialValue: draft?.relayLegStroke ?? defaultLegStroke)
+        _relayLegSeconds = State(initialValue: draft?.relayLegSeconds ?? 0)
+        _isRelayLeadOff = State(initialValue: draft?.isRelayLeadOff ?? (leg == 1))
     }
 
     private var catalog: [SwimEvent] {
@@ -65,18 +79,14 @@ struct ResultEntryView: View {
         catalog.filter { $0.stroke == stroke }.map { $0.distance }
     }
 
-    private var totalSeconds: Double {
-        Double(minutes) * 60 + Double(seconds) + Double(hundredths) / 100.0
-    }
-
     private var selectedEvent: SwimEvent {
         SwimEvent(distance: distance, stroke: stroke, course: course, isRelay: isRelay)
     }
 
     private var previewScore: Int? {
-        guard !isRelay, totalSeconds > 0 else { return nil }
+        guard !isRelay, timeSeconds > 0 else { return nil }
         return store.baseSeconds(for: SwimEvent(distance: distance, stroke: stroke, course: course))
-            .flatMap { SwimScore.points(seconds: totalSeconds, base: $0) }
+            .flatMap { SwimScore.points(seconds: timeSeconds, base: $0) }
     }
 
     private var canSave: Bool {
@@ -84,79 +94,135 @@ struct ResultEntryView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Event") {
-                    Picker("Type", selection: $isRelay) {
-                        Text("Individual").tag(false)
-                        Text("Relay").tag(true)
-                    }
-                    .pickerStyle(.segmented)
+        Form {
+            Section("Event") {
+                Picker("Type", selection: $isRelay) {
+                    Text("Individual").tag(false)
+                    Text("Relay").tag(true)
+                }
+                .pickerStyle(.segmented)
 
+                if fixedCourse == nil {
                     Picker("Course", selection: $course) {
                         ForEach(Course.allCases) { course in
                             Text(course.rawValue).tag(course)
                         }
                     }
                     .pickerStyle(.segmented)
+                } else {
+                    LabeledContent("Course", value: course.rawValue)
+                }
 
-                    Picker(strokePickerTitle, selection: $stroke) {
-                        ForEach(availableStrokes) { stroke in
-                            Text(strokeLabel(stroke)).tag(stroke)
-                        }
-                    }
-
-                    Picker("Distance", selection: $distance) {
-                        ForEach(availableDistances, id: \.self) { distance in
-                            Text(distanceLabel(distance)).tag(distance)
-                        }
+                Picker(strokePickerTitle, selection: $stroke) {
+                    ForEach(availableStrokes) { stroke in
+                        Text(strokeLabel(stroke)).tag(stroke)
                     }
                 }
 
+                Picker("Distance", selection: $distance) {
+                    ForEach(availableDistances, id: \.self) { distance in
+                        Text(distanceLabel(distance)).tag(distance)
+                    }
+                }
+            }
+
+            if isRelay {
+                relaySection
+            }
+
+            Section {
+                SwimTimePad(seconds: $timeSeconds)
+            } header: {
+                Text(isRelay ? "Relay time (optional)" : "Time (optional)")
+            } footer: {
+                HStack {
+                    Text(timeSeconds > 0 ? timeSeconds.asSwimTime : "No time yet")
+                        .monospacedDigit()
+                    Spacer()
+                    if let previewScore {
+                        Text("\(previewScore) pts")
+                    }
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(timeSeconds > 0 ? Theme.accent : .secondary)
+            }
+
+            if isRelay {
                 Section {
-                    SwimTimeWheels(minutes: $minutes, seconds: $seconds, hundredths: $hundredths)
+                    SwimTimePad(seconds: $relayLegSeconds)
                 } header: {
-                    Text("Time (optional)")
+                    Text("Your leg time (optional)")
                 } footer: {
-                    HStack {
-                        Text(totalSeconds > 0 ? totalSeconds.asSwimTime : "No time yet")
-                            .monospacedDigit()
-                        Spacer()
-                        if let previewScore {
-                            Text("\(previewScore) pts")
-                        }
+                    Text(relayLegSeconds > 0 ? relayLegSeconds.asSwimTime : "No leg time yet")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(relayLegSeconds > 0 ? Theme.accent : .secondary)
+                        .monospacedDigit()
+                }
+            }
+
+            SplitEntrySection(
+                distance: distance,
+                unit: course.unit,
+                isRelay: isRelay,
+                splits: $splitValues,
+                finalSeconds: timeSeconds,
+                onUseSplitTotal: { timeSeconds = $0 }
+            )
+
+            Section("Note") {
+                TextField("Note (optional)", text: $note)
+            }
+        }
+        .navigationTitle(navigationTitleText)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { save() }
+                    .disabled(!canSave)
+            }
+        }
+        .onChange(of: isRelay) { _, _ in reconcile() }
+        .onChange(of: course) { _, _ in reconcile() }
+        .onChange(of: stroke) { _, newStroke in
+            reconcile()
+            if isRelay, newStroke == .medley {
+                relayLegStroke = RelayLegInfo.defaultMedleyStroke(forLeg: relayLeg)
+            } else if isRelay {
+                relayLegStroke = .freestyle
+            }
+        }
+        .onChange(of: relayLeg) { _, newLeg in
+            isRelayLeadOff = (newLeg == 1)
+            if stroke == .medley {
+                relayLegStroke = RelayLegInfo.defaultMedleyStroke(forLeg: newLeg)
+            }
+        }
+        .onAppear {
+            if let fixedCourse { course = fixedCourse }
+        }
+    }
+
+    private var relaySection: some View {
+        Section("Your relay leg") {
+            Picker("Leg", selection: $relayLeg) {
+                ForEach(RelayLegInfo.legs, id: \.self) { leg in
+                    Text("Leg \(leg)").tag(leg)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if stroke == .medley {
+                Picker("Stroke", selection: $relayLegStroke) {
+                    ForEach(RelayLegInfo.medleyStrokes) { stroke in
+                        Text(stroke.fullName).tag(stroke)
                     }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(totalSeconds > 0 ? Theme.accent : .secondary)
-                }
-
-                SplitEntrySection(
-                    distance: distance,
-                    unit: course.unit,
-                    isRelay: isRelay,
-                    splits: $splitValues,
-                    finalSeconds: totalSeconds,
-                    onUseSplitTotal: applyFinalTime
-                )
-
-                Section("Note") {
-                    TextField("Note (optional)", text: $note)
                 }
             }
-            .navigationTitle(navigationTitleText)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                }
-            }
-            .onChange(of: isRelay) { _, _ in reconcile() }
-            .onChange(of: course) { _, _ in reconcile() }
-            .onChange(of: stroke) { _, _ in reconcile() }
+
+            Toggle("Lead-off", isOn: $isRelayLeadOff)
         }
     }
 
@@ -186,16 +252,25 @@ struct ResultEntryView: View {
         }
     }
 
-    private func applyFinalTime(_ value: Double) {
-        let components = value.swimTimeComponents
-        minutes = components.minutes
-        seconds = components.seconds
-        hundredths = components.hundredths
-    }
-
     private func save() {
         guard canSave else { return }
-        onSave(selectedEvent, totalSeconds > 0 ? totalSeconds : nil, note, splitValues)
+        var saved = draft ?? ResultDraft(event: selectedEvent, seconds: nil, note: "")
+        saved.event = selectedEvent
+        saved.seconds = timeSeconds > 0 ? timeSeconds : nil
+        saved.note = note
+        saved.splits = splitValues
+        if isRelay {
+            saved.relayLeg = relayLeg
+            saved.relayLegStroke = stroke == .medley ? relayLegStroke : .freestyle
+            saved.relayLegSeconds = relayLegSeconds > 0 ? relayLegSeconds : nil
+            saved.isRelayLeadOff = isRelayLeadOff
+        } else {
+            saved.relayLeg = nil
+            saved.relayLegStroke = nil
+            saved.relayLegSeconds = nil
+            saved.isRelayLeadOff = false
+        }
+        onSave(saved)
         dismiss()
     }
 }

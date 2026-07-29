@@ -124,22 +124,7 @@ private struct BaseTimeEditorSheet: View {
     let event: SwimEvent
     let gender: Gender
 
-    @State private var minutes: Int
-    @State private var seconds: Int
-    @State private var hundredths: Int
-
-    init(event: SwimEvent, gender: Gender) {
-        self.event = event
-        self.gender = gender
-        // Placeholder; real values set in onAppear via store.
-        _minutes = State(initialValue: 0)
-        _seconds = State(initialValue: 0)
-        _hundredths = State(initialValue: 0)
-    }
-
-    private var totalSeconds: Double {
-        Double(minutes) * 60 + Double(seconds) + Double(hundredths) / 100.0
-    }
+    @State private var timeSeconds: Double = 0
 
     private var factoryDefault: Double? {
         BaseTimes.defaultSeconds(for: event, gender: gender)
@@ -159,12 +144,12 @@ private struct BaseTimeEditorSheet: View {
                 }
 
                 Section {
-                    SwimTimeWheels(minutes: $minutes, seconds: $seconds, hundredths: $hundredths)
+                    SwimTimePad(seconds: $timeSeconds)
                 } header: {
                     Text("1000-point base time")
                 } footer: {
-                    Text(totalSeconds > 0
-                         ? "A swim of \(totalSeconds.asSwimTime) scores 1000 points."
+                    Text(timeSeconds > 0
+                         ? "A swim of \(timeSeconds.asSwimTime) scores 1000 points."
                          : "Enter the new record / base time.")
                     .monospacedDigit()
                 }
@@ -186,18 +171,14 @@ private struct BaseTimeEditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        store.setBaseTime(for: event, gender: gender, seconds: totalSeconds)
+                        store.setBaseTime(for: event, gender: gender, seconds: timeSeconds)
                         dismiss()
                     }
-                    .disabled(totalSeconds <= 0)
+                    .disabled(timeSeconds <= 0)
                 }
             }
             .onAppear {
-                let seed = store.baseSeconds(for: event, gender: gender) ?? factoryDefault ?? 0
-                let components = seed.swimTimeComponents
-                minutes = components.minutes
-                seconds = components.seconds
-                hundredths = components.hundredths
+                timeSeconds = store.baseSeconds(for: event, gender: gender) ?? factoryDefault ?? 0
             }
         }
         .presentationDetents([.medium, .large])

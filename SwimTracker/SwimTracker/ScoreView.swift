@@ -280,9 +280,7 @@ struct CalcScoreView: View {
     @State private var course: Course = .scy
     @State private var stroke: Stroke = .freestyle
     @State private var distance: Int = 100
-    @State private var minutes = 0
-    @State private var seconds = 0
-    @State private var hundredths = 0
+    @State private var timeSeconds = 0.0
     @State private var didApplyDefaults = false
 
     private var availableStrokes: [Stroke] {
@@ -300,9 +298,7 @@ struct CalcScoreView: View {
         SwimEvent(distance: distance, stroke: stroke, course: course)
     }
 
-    private var totalSeconds: Double {
-        Double(minutes * 60 + seconds) + Double(hundredths) / 100.0
-    }
+    private var totalSeconds: Double { timeSeconds }
 
     private var baseSeconds: Double? {
         store.baseSeconds(for: event, gender: gender)
@@ -346,7 +342,7 @@ struct CalcScoreView: View {
             }
 
             Section {
-                SwimTimeWheels(minutes: $minutes, seconds: $seconds, hundredths: $hundredths)
+                SwimTimePad(seconds: $timeSeconds)
             } header: {
                 Text("Time")
             }

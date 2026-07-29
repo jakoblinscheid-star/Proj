@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Enter interval times for each 50. Tap a row to edit it with the shared time wheels.
+/// Enter interval times for each 50. Tap a row to edit it with the shared time pad.
 struct SplitEntrySection: View {
     let distance: Int
     let unit: String
@@ -10,8 +10,6 @@ struct SplitEntrySection: View {
     /// Optional final time used to compare against the split total.
     var finalSeconds: Double = 0
     var onUseSplitTotal: ((Double) -> Void)? = nil
-
-    @State private var editing: SplitEditTarget? = nil
 
     private var expectedCount: Int {
         SwimSplits.fiftyCount(distance: distance, isRelay: isRelay)
@@ -49,8 +47,16 @@ struct SplitEntrySection: View {
     private var entrySection: some View {
         Section {
             ForEach(0..<expectedCount, id: \.self) { index in
-                Button {
-                    editing = SplitEditTarget(index: index)
+                NavigationLink {
+                    SplitEditorView(
+                        title: SwimSplits.rangeLabel(index: index, segmentDistance: 50, unit: unit),
+                        seconds: splits[safe: index] ?? 0
+                    ) { value in
+                        resizeIfNeeded()
+                        if splits.indices.contains(index) {
+                            splits[index] = value
+                        }
+                    }
                 } label: {
                     HStack {
                         Text(SwimSplits.rangeLabel(index: index, segmentDistance: 50, unit: unit))
@@ -93,17 +99,6 @@ struct SplitEntrySection: View {
         .onAppear { resizeIfNeeded() }
         .onChange(of: distance) { _, _ in resizeIfNeeded() }
         .onChange(of: isRelay) { _, _ in resizeIfNeeded() }
-        .sheet(item: $editing) { target in
-            SplitEditorSheet(
-                title: SwimSplits.rangeLabel(index: target.index, segmentDistance: 50, unit: unit),
-                seconds: splits[safe: target.index] ?? 0
-            ) { value in
-                resizeIfNeeded()
-                if splits.indices.contains(target.index) {
-                    splits[target.index] = value
-                }
-            }
-        }
     }
 
     private var footerIsWarning: Bool {
@@ -210,64 +205,44 @@ struct SplitsBreakdownView: View {
     }
 }
 
-/// Compact sheet to edit one 50-split with the shared wheels.
-private struct SplitEditorSheet: View {
+/// Pushed editor for one 50-split (keeps parent sheets open — no nested sheet).
+struct SplitEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     let title: String
     let onSave: (Double) -> Void
 
-    @State private var minutes: Int
-    @State private var seconds: Int
-    @State private var hundredths: Int
+    @State private var timeSeconds: Double
 
     init(title: String, seconds initial: Double, onSave: @escaping (Double) -> Void) {
         self.title = title
         self.onSave = onSave
-        let components = max(initial, 0).swimTimeComponents
-        _minutes = State(initialValue: components.minutes)
-        _seconds = State(initialValue: components.seconds)
-        _hundredths = State(initialValue: components.hundredths)
-    }
-
-    private var totalSeconds: Double {
-        Double(minutes) * 60 + Double(seconds) + Double(hundredths) / 100.0
+        _timeSeconds = State(initialValue: max(initial, 0))
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    SwimTimeWheels(minutes: $minutes, seconds: $seconds, hundredths: $hundredths)
-                } footer: {
-                    Text(totalSeconds > 0 ? totalSeconds.asSwimTime : "Enter a split")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(totalSeconds > 0 ? Theme.accent : .secondary)
-                        .monospacedDigit()
-                }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onSave(totalSeconds)
-                        dismiss()
-                    }
-                    .disabled(totalSeconds <= 0)
-                }
+        Form {
+            Section {
+                SwimTimePad(seconds: $timeSeconds)
+            } footer: {
+                Text(timeSeconds > 0 ? timeSeconds.asSwimTime : "Enter a split")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(timeSeconds > 0 ? Theme.accent : .secondary)
+                    .monospacedDigit()
             }
         }
-        .presentationDetents([.medium])
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    onSave(timeSeconds)
+                    dismiss()
+                }
+                .disabled(timeSeconds <= 0)
+            }
+        }
     }
-}
-
-private struct SplitEditTarget: Identifiable {
-    let index: Int
-    var id: Int { index }
 }
 
 private extension Array where Element == Double {

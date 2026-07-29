@@ -104,15 +104,26 @@ struct MeetRowView: View {
 
             Spacer(minLength: 8)
 
-            Text(meet.date.asRelativeDay)
+            Text(meetDateLabel)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 4)
     }
 
     private var subtitle: String {
-        [meet.team, meet.location].filter { !$0.isEmpty }.joined(separator: " · ")
+        var parts = [meet.team, meet.location].filter { !$0.isEmpty }
+        parts.append(meet.course.rawValue)
+        return parts.joined(separator: " · ")
+    }
+
+    private var meetDateLabel: String {
+        let calendar = Calendar.current
+        if calendar.isDate(meet.date, inSameDayAs: meet.endDate) {
+            return meet.date.asRelativeDay
+        }
+        return meet.dateRangeLabel
     }
 }
 

@@ -9,7 +9,50 @@ struct Meet: Identifiable, Codable, Hashable {
     /// The team/club you were swimming under at this meet.
     var team: String = ""
     var location: String = ""
+    /// First day of the meet (also used for result dates and sorting).
     var date: Date = Date()
+    /// Last day of the meet. Same as `date` for a single-day meet.
+    var endDate: Date = Date()
+    /// Pool length / course for every event at this meet.
+    var course: Course = .scy
+
+    /// Inclusive date range label, e.g. "Jul 1, 2026" or "Jul 1–3, 2026".
+    var dateRangeLabel: String {
+        let calendar = Calendar.current
+        if calendar.isDate(date, inSameDayAs: endDate) {
+            return date.asShortDate
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        if calendar.component(.year, from: date) == calendar.component(.year, from: endDate) {
+            let startFormatter = DateFormatter()
+            startFormatter.dateFormat = "MMM d"
+            let endFormatter = DateFormatter()
+            endFormatter.dateFormat = "MMM d, yyyy"
+            return "\(startFormatter.string(from: date))–\(endFormatter.string(from: endDate))"
+        }
+        return "\(formatter.string(from: date)) – \(formatter.string(from: endDate))"
+    }
+}
+
+/// Helpers for relay leg metadata (4-person relays).
+enum RelayLegInfo {
+    static let legs = Array(1...4)
+
+    /// Conventional medley order: back, breast, fly, free.
+    static func defaultMedleyStroke(forLeg leg: Int) -> Stroke {
+        switch leg {
+        case 1: return .backstroke
+        case 2: return .breaststroke
+        case 3: return .butterfly
+        default: return .freestyle
+        }
+    }
+
+    static var medleyStrokes: [Stroke] {
+        [.backstroke, .breaststroke, .butterfly, .freestyle]
+    }
 }
 
 // MARK: - Swim vocabulary
@@ -159,6 +202,7 @@ struct SwimTime: Identifiable, Codable, Hashable {
     var distance: Int
     var stroke: Stroke
     var course: Course
+    /// Final time (individual) or whole-relay team time (relay).
     var seconds: Double? = nil
     /// Interval time for each 50 of the race. Empty when splits were not recorded.
     /// When present, count must equal `distance / 50` and every value must be > 0.
@@ -167,6 +211,14 @@ struct SwimTime: Identifiable, Codable, Hashable {
     var meetID: String? = nil
     var isRelay: Bool = false
     var note: String = ""
+    /// Which leg you swam (1–4). Nil for individual swims.
+    var relayLeg: Int? = nil
+    /// Stroke for that leg (required for medley; free relays use freestyle).
+    var relayLegStroke: Stroke? = nil
+    /// Your personal leg split time.
+    var relayLegSeconds: Double? = nil
+    /// True when this was the lead-off leg (typically leg 1).
+    var isRelayLeadOff: Bool = false
 
     var event: SwimEvent { SwimEvent(distance: distance, stroke: stroke, course: course, isRelay: isRelay) }
 
@@ -182,7 +234,7 @@ struct SwimTime: Identifiable, Codable, Hashable {
 // extensions preserves each struct's memberwise initializer.
 
 extension Meet {
-    enum CodingKeys: String, CodingKey { case id, name, team, location, date }
+    enum CodingKeys: String, CodingKey { case id, name, team, location, date, endDate, course }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -191,12 +243,15 @@ extension Meet {
         team = try container.decodeIfPresent(String.self, forKey: .team) ?? ""
         location = try container.decodeIfPresent(String.self, forKey: .location) ?? ""
         date = try container.decodeIfPresent(Date.self, forKey: .date) ?? Date()
+        endDate = try container.decodeIfPresent(Date.self, forKey: .endDate) ?? date
+        course = try container.decodeIfPresent(Course.self, forKey: .course) ?? .scy
     }
 }
 
 extension SwimTime {
     enum CodingKeys: String, CodingKey {
         case id, distance, stroke, course, seconds, splits, date, meetID, isRelay, note
+        case relayLeg, relayLegStroke, relayLegSeconds, isRelayLeadOff
     }
 
     init(from decoder: Decoder) throws {
@@ -211,7 +266,25 @@ extension SwimTime {
         meetID = try container.decodeIfPresent(String.self, forKey: .meetID)
         isRelay = try container.decodeIfPresent(Bool.self, forKey: .isRelay) ?? false
         note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
+        relayLeg = try container.decodeIfPresent(Int.self, forKey: .relayLeg)
+        relayLegStroke = try container.decodeIfPresent(Stroke.self, forKey: .relayLegStroke)
+        relayLegSeconds = try container.decodeIfPresent(Double.self, forKey: .relayLegSeconds)
+        isRelayLeadOff = try container.decodeIfPresent(Bool.self, forKey: .isRelayLeadOff) ?? false
     }
+}
+
+/// A pending or composed event result (used while creating a meet, and as the
+/// save payload from `ResultEntryView`).
+struct ResultDraft: Identifiable {
+    var id: String = UUID().uuidString
+    var event: SwimEvent
+    var seconds: Double?
+    var note: String
+    var splits: [Double] = []
+    var relayLeg: Int? = nil
+    var relayLegStroke: Stroke? = nil
+    var relayLegSeconds: Double? = nil
+    var isRelayLeadOff: Bool = false
 }
 
 // MARK: - Splits
@@ -382,31 +455,41 @@ final class Store {
 
     /// Creates a meet and returns its id so callers can immediately attach results.
     @discardableResult
-    func addMeet(name: String, team: String, location: String, date: Date) -> String? {
+    func addMeet(name: String, team: String, location: String, date: Date, endDate: Date, course: Course) -> String? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        let start = date
+        let end = max(endDate, start)
         let meet = Meet(name: trimmed,
                         team: team.trimmingCharacters(in: .whitespacesAndNewlines),
                         location: location.trimmingCharacters(in: .whitespacesAndNewlines),
-                        date: date)
+                        date: start,
+                        endDate: end,
+                        course: course)
         meets.append(meet)
         return meet.id
     }
 
-    func updateMeet(id: String, name: String, team: String, location: String, date: Date) {
+    func updateMeet(id: String, name: String, team: String, location: String, date: Date, endDate: Date, course: Course) {
         guard let index = meets.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let dateChanged = meets[index].date != date
+        let start = date
+        let end = max(endDate, start)
+        let dateChanged = meets[index].date != start
+        let courseChanged = meets[index].course != course
         meets[index].name = trimmed
         meets[index].team = team.trimmingCharacters(in: .whitespacesAndNewlines)
         meets[index].location = location.trimmingCharacters(in: .whitespacesAndNewlines)
-        meets[index].date = date
+        meets[index].date = start
+        meets[index].endDate = end
+        meets[index].course = course
 
-        // Keep results in sync with the meet date so progression charts stay accurate.
-        if dateChanged {
+        // Keep results in sync with the meet date / course.
+        if dateChanged || courseChanged {
             for i in times.indices where times[i].meetID == id {
-                times[i].date = date
+                if dateChanged { times[i].date = start }
+                if courseChanged { times[i].course = course }
             }
         }
     }
@@ -604,7 +687,21 @@ final class Store {
             .sorted { $0.year < $1.year }
     }
 
-    func addTime(distance: Int, stroke: Stroke, course: Course, seconds: Double?, date: Date, meetID: String?, isRelay: Bool = false, note: String, splits: [Double] = []) {
+    func addTime(
+        distance: Int,
+        stroke: Stroke,
+        course: Course,
+        seconds: Double?,
+        date: Date,
+        meetID: String?,
+        isRelay: Bool = false,
+        note: String,
+        splits: [Double] = [],
+        relayLeg: Int? = nil,
+        relayLegStroke: Stroke? = nil,
+        relayLegSeconds: Double? = nil,
+        isRelayLeadOff: Bool = false
+    ) {
         let time = SwimTime(distance: distance,
                             stroke: stroke,
                             course: course,
@@ -613,11 +710,30 @@ final class Store {
                             date: date,
                             meetID: meetID,
                             isRelay: isRelay,
-                            note: note.trimmingCharacters(in: .whitespacesAndNewlines))
+                            note: note.trimmingCharacters(in: .whitespacesAndNewlines),
+                            relayLeg: isRelay ? relayLeg : nil,
+                            relayLegStroke: isRelay ? relayLegStroke : nil,
+                            relayLegSeconds: isRelay ? normalized(relayLegSeconds) : nil,
+                            isRelayLeadOff: isRelay && isRelayLeadOff)
         times.append(time)
     }
 
-    func updateTime(id: String, distance: Int, stroke: Stroke, course: Course, seconds: Double?, date: Date, meetID: String?, isRelay: Bool, note: String, splits: [Double] = []) {
+    func updateTime(
+        id: String,
+        distance: Int,
+        stroke: Stroke,
+        course: Course,
+        seconds: Double?,
+        date: Date,
+        meetID: String?,
+        isRelay: Bool,
+        note: String,
+        splits: [Double] = [],
+        relayLeg: Int? = nil,
+        relayLegStroke: Stroke? = nil,
+        relayLegSeconds: Double? = nil,
+        isRelayLeadOff: Bool = false
+    ) {
         guard let index = times.firstIndex(where: { $0.id == id }) else { return }
         times[index].distance = distance
         times[index].stroke = stroke
@@ -628,6 +744,10 @@ final class Store {
         times[index].meetID = meetID
         times[index].isRelay = isRelay
         times[index].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        times[index].relayLeg = isRelay ? relayLeg : nil
+        times[index].relayLegStroke = isRelay ? relayLegStroke : nil
+        times[index].relayLegSeconds = isRelay ? normalized(relayLegSeconds) : nil
+        times[index].isRelayLeadOff = isRelay && isRelayLeadOff
     }
 
     func deleteTime(id: String) {
@@ -647,17 +767,24 @@ final class Store {
     }
 
     /// A recorded event (with or without a time) attached to a meet.
-    func addResult(toMeet meetID: String, event: SwimEvent, seconds: Double?, note: String = "", splits: [Double] = []) {
-        let date = meet(id: meetID)?.date ?? Date()
+    func addResult(toMeet meetID: String, draft: ResultDraft) {
+        let meet = meet(id: meetID)
+        let date = meet?.date ?? Date()
+        let course = meet?.course ?? draft.event.course
+        let event = SwimEvent(distance: draft.event.distance, stroke: draft.event.stroke, course: course, isRelay: draft.event.isRelay)
         addTime(distance: event.distance,
                 stroke: event.stroke,
                 course: event.course,
-                seconds: seconds,
+                seconds: draft.seconds,
                 date: date,
                 meetID: meetID,
                 isRelay: event.isRelay,
-                note: note,
-                splits: splits)
+                note: draft.note,
+                splits: draft.splits,
+                relayLeg: draft.relayLeg,
+                relayLegStroke: draft.relayLegStroke,
+                relayLegSeconds: draft.relayLegSeconds,
+                isRelayLeadOff: draft.isRelayLeadOff)
     }
 
     // MARK: Persistence
