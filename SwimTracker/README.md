@@ -50,16 +50,13 @@ the auto-resign toolchain in the repo's [`mac/`](../mac) folder.
 ```
 SwimTracker/
 ├─ SwimTracker.xcodeproj/       # the Xcode project (shared "SwimTracker" scheme)
-└─ SwimTracker/
-   ├─ SwimTrackerApp.swift      # @main app entry point
-   ├─ Models.swift              # Meet/SwimTime models, scoring + base times, persistent Store
-   ├─ Theme.swift               # colors + date/time helpers
-   ├─ ContentView.swift         # root TabView (Home / Times / Meets / Score)
-   ├─ HomeView.swift            # recent meets
-   ├─ TimesView.swift           # Times tab: best times, swim score, event detail + graph
-   ├─ MeetsView.swift           # meets list, meet detail, events swam (individual + relay), team
-   ├─ ScoreView.swift           # Score tab (placeholder)
-   └─ Assets.xcassets           # AppIcon (placeholder) + AccentColor
+├─ SwimTracker/
+│  ├─ Shared/                   # App Group + goals widget snapshot (app + widget)
+│  ├─ SwimTrackerApp.swift      # @main app entry point
+│  ├─ Models.swift              # Meet/SwimTime/goals models, scoring, persistent Store
+│  ├─ GoalsView.swift           # Goals page (from Times)
+│  └─ …
+└─ SwimTrackerWidget/           # Home Screen Goals widget (WidgetKit)
 ```
 
 ## Build & run on your phone (first time)
@@ -70,10 +67,15 @@ SwimTracker/
    - Set **Team** to your Apple ID (free personal team is fine).
    - Change the **Bundle Identifier** from `com.yourname.swimtracker` to something
      unique to you (e.g. `com.<yourname>.swimtracker`).
+   - Under **App Groups**, enable `group.com.yourname.swimtracker` (or create a matching
+     `group.<your-bundle-id>` and update both entitlements + `AppGroup.identifier`).
+   - Repeat signing / App Groups for the **SwimTrackerWidget** target (bundle id should
+     stay `<app-bundle-id>.widget`).
 3. Plug in your iPhone and pick it as the run destination (top toolbar).
 4. Press **⌘R** to build & run. The app installs on your phone.
 5. First launch: on the iPhone go to **Settings → General → VPN & Device Management**,
    tap your developer profile, and **Trust** it. Reopen the app.
+6. Add the widget: long-press the Home Screen → **+** → search **SwimTracker** / **Goals**.
 
 ## Keeping it alive past 7 days
 

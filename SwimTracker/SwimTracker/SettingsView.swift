@@ -78,7 +78,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Backup")
                 } footer: {
-                    Text("Export a JSON backup of your meets, times, base times, and settings. Import replaces everything currently on this device.")
+                    Text("Export a JSON backup of your meets, times, goals, base times, and settings. Import replaces everything currently on this device.")
                 }
             }
             .navigationTitle("Settings")
@@ -119,7 +119,7 @@ struct SettingsView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Importing replaces your meets, times, base times, and settings with the backup file. This cannot be undone.")
+                Text("Importing replaces your meets, times, goals, base times, and settings with the backup file. This cannot be undone.")
             }
             .alert(item: $alert) { item in
                 Alert(title: Text(item.title), message: Text(item.message), dismissButton: .default(Text("OK")))

@@ -29,11 +29,45 @@
 		3B0000000000000000000015 /* MeetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000015 /* MeetDetailView.swift */; };
 		3B0000000000000000000016 /* ResultEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000016 /* ResultEntryView.swift */; };
 		3B0000000000000000000017 /* RadarChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000017 /* RadarChartView.swift */; };
+		3B0000000000000000000018 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000018 /* GoalsView.swift */; };
+		3B0000000000000000000019 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000019 /* AppGroup.swift */; };
+		3B000000000000000000001A /* GoalsWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000001A /* GoalsWidgetSnapshot.swift */; };
+		3B000000000000000000001B /* WidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000001B /* WidgetBridge.swift */; };
+		3B000000000000000000001C /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000019 /* AppGroup.swift */; };
+		3B000000000000000000001D /* GoalsWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000001A /* GoalsWidgetSnapshot.swift */; };
+		3B000000000000000000001E /* GoalsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000001E /* GoalsWidget.swift */; };
+		3B000000000000000000001F /* GoalsWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000001F /* GoalsWidgetBundle.swift */; };
+		3B0000000000000000000020 /* SwimTrackerWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1B0000000000000000000021 /* SwimTrackerWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		3B0000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000009 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		1B0000000000000000000022 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1B0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1B0000000000000000000023;
+			remoteInfo = SwimTrackerWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1B0000000000000000000024 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3B0000000000000000000020 /* SwimTrackerWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		1B0000000000000000000008 /* SwimTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwimTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1B0000000000000000000021 /* SwimTrackerWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwimTrackerWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B0000000000000000000001 /* SwimTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwimTrackerApp.swift; sourceTree = "<group>"; };
 		2B0000000000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		2B0000000000000000000003 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -56,11 +90,27 @@
 		2B0000000000000000000015 /* MeetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetDetailView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000016 /* ResultEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultEntryView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000017 /* RadarChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadarChartView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000018 /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000019 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
+		2B000000000000000000001A /* GoalsWidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidgetSnapshot.swift; sourceTree = "<group>"; };
+		2B000000000000000000001B /* WidgetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridge.swift; sourceTree = "<group>"; };
+		2B000000000000000000001C /* SwimTracker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SwimTracker.entitlements; sourceTree = "<group>"; };
+		2B000000000000000000001E /* GoalsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidget.swift; sourceTree = "<group>"; };
+		2B000000000000000000001F /* GoalsWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidgetBundle.swift; sourceTree = "<group>"; };
+		2B0000000000000000000025 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2B0000000000000000000026 /* SwimTrackerWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SwimTrackerWidget.entitlements; sourceTree = "<group>"; };
 		2B0000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		1B0000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1B0000000000000000000027 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -74,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				1B000000000000000000000F /* SwimTracker */,
+				1B0000000000000000000028 /* SwimTrackerWidget */,
 				1B0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -82,6 +133,7 @@
 			isa = PBXGroup;
 			children = (
 				1B0000000000000000000008 /* SwimTracker.app */,
+				1B0000000000000000000021 /* SwimTrackerWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -89,6 +141,7 @@
 		1B000000000000000000000F /* SwimTracker */ = {
 			isa = PBXGroup;
 			children = (
+				1B0000000000000000000029 /* Shared */,
 				2B0000000000000000000001 /* SwimTrackerApp.swift */,
 				2B0000000000000000000002 /* Models.swift */,
 				2B0000000000000000000003 /* Theme.swift */,
@@ -111,9 +164,32 @@
 				2B0000000000000000000015 /* MeetDetailView.swift */,
 				2B0000000000000000000016 /* ResultEntryView.swift */,
 				2B0000000000000000000017 /* RadarChartView.swift */,
+				2B0000000000000000000018 /* GoalsView.swift */,
+				2B000000000000000000001B /* WidgetBridge.swift */,
+				2B000000000000000000001C /* SwimTracker.entitlements */,
 				2B0000000000000000000009 /* Assets.xcassets */,
 			);
 			path = SwimTracker;
+			sourceTree = "<group>";
+		};
+		1B0000000000000000000028 /* SwimTrackerWidget */ = {
+			isa = PBXGroup;
+			children = (
+				2B000000000000000000001E /* GoalsWidget.swift */,
+				2B000000000000000000001F /* GoalsWidgetBundle.swift */,
+				2B0000000000000000000025 /* Info.plist */,
+				2B0000000000000000000026 /* SwimTrackerWidget.entitlements */,
+			);
+			path = SwimTrackerWidget;
+			sourceTree = "<group>";
+		};
+		1B0000000000000000000029 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				2B0000000000000000000019 /* AppGroup.swift */,
+				2B000000000000000000001A /* GoalsWidgetSnapshot.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -126,15 +202,34 @@
 				1B0000000000000000000005 /* Sources */,
 				1B0000000000000000000006 /* Frameworks */,
 				1B0000000000000000000007 /* Resources */,
+				1B0000000000000000000024 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1B000000000000000000002A /* PBXTargetDependency */,
 			);
 			name = SwimTracker;
 			productName = SwimTracker;
 			productReference = 1B0000000000000000000008 /* SwimTracker.app */;
 			productType = "com.apple.product-type.application";
+		};
+		1B0000000000000000000023 /* SwimTrackerWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1B000000000000000000002B /* Build configuration list for PBXNativeTarget "SwimTrackerWidget" */;
+			buildPhases = (
+				1B000000000000000000002C /* Sources */,
+				1B0000000000000000000027 /* Frameworks */,
+				1B000000000000000000002D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SwimTrackerWidget;
+			productName = SwimTrackerWidget;
+			productReference = 1B0000000000000000000021 /* SwimTrackerWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -147,6 +242,9 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					1B0000000000000000000004 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					1B0000000000000000000023 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -165,6 +263,7 @@
 			projectRoot = "";
 			targets = (
 				1B0000000000000000000004 /* SwimTracker */,
+				1B0000000000000000000023 /* SwimTrackerWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -175,6 +274,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				3B0000000000000000000009 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1B000000000000000000002D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -207,10 +313,33 @@
 				3B0000000000000000000015 /* MeetDetailView.swift in Sources */,
 				3B0000000000000000000016 /* ResultEntryView.swift in Sources */,
 				3B0000000000000000000017 /* RadarChartView.swift in Sources */,
+				3B0000000000000000000018 /* GoalsView.swift in Sources */,
+				3B0000000000000000000019 /* AppGroup.swift in Sources */,
+				3B000000000000000000001A /* GoalsWidgetSnapshot.swift in Sources */,
+				3B000000000000000000001B /* WidgetBridge.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1B000000000000000000002C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3B000000000000000000001E /* GoalsWidget.swift in Sources */,
+				3B000000000000000000001F /* GoalsWidgetBundle.swift in Sources */,
+				3B000000000000000000001C /* AppGroup.swift in Sources */,
+				3B000000000000000000001D /* GoalsWidgetSnapshot.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1B000000000000000000002A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1B0000000000000000000023 /* SwimTrackerWidget */;
+			targetProxy = 1B0000000000000000000022 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1B000000000000000000000B /* Debug */ = {
@@ -337,6 +466,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SwimTracker/SwimTracker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -366,6 +496,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SwimTracker/SwimTracker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -390,6 +521,60 @@
 			};
 			name = Release;
 		};
+		1B000000000000000000002E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SwimTrackerWidget/SwimTrackerWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwimTrackerWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Goals;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.swimtracker.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1B000000000000000000002F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SwimTrackerWidget/SwimTrackerWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwimTrackerWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Goals;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.swimtracker.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -407,6 +592,15 @@
 			buildConfigurations = (
 				1B000000000000000000000D /* Debug */,
 				1B000000000000000000000E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1B000000000000000000002B /* Build configuration list for PBXNativeTarget "SwimTrackerWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1B000000000000000000002E /* Debug */,
+				1B000000000000000000002F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

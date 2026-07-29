@@ -21,7 +21,12 @@ struct TimesView: View {
             }
             .navigationTitle("Times")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { baseTimesButton }
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 12) {
+                        goalsLink
+                        baseTimesButton
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Picker("Sort by", selection: $store.settings.timesSortMode) {
@@ -74,7 +79,7 @@ struct TimesView: View {
                         eventLink(event)
                     }
                 } footer: {
-                    Text("World Aquatics points (\(store.settings.gender.rawValue.lowercased())), best time per event.")
+                    Text("World Aquatics points (\(store.settings.gender.rawValue.lowercased())), best time per event. All-time goals shown under each best.")
                 }
             case .event:
                 ForEach(coursesToShow) { course in
@@ -122,6 +127,14 @@ struct TimesView: View {
 
     // MARK: Toolbar pieces
 
+    private var goalsLink: some View {
+        NavigationLink {
+            GoalsView()
+        } label: {
+            Label("Goals", systemImage: "target")
+        }
+    }
+
     private var baseTimesButton: some View {
         Button {
             showingBaseTimes = true
@@ -163,6 +176,7 @@ struct BestTimeRowView: View {
 
     private var best: SwimTime? { store.bestTime(for: event) }
     private var count: Int { store.recordedTimes(for: event).count }
+    private var allTimeGoal: Double? { store.goals(for: event)?.allTimeSeconds }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -183,6 +197,12 @@ struct BestTimeRowView: View {
                     Text(seconds.asSwimTime)
                         .font(.headline)
                         .monospacedDigit()
+                    if let allTimeGoal {
+                        Text("Goal \(allTimeGoal.asSwimTime)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
                 }
                 if let score = store.bestScore(for: event) {
                     ScoreBadge(points: score)

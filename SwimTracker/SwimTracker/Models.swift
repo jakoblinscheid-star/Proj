@@ -419,6 +419,58 @@ struct StrokeScore: Identifiable, Hashable {
     var isEmpty: Bool { overall.isEmpty }
 }
 
+// MARK: - Goals
+
+/// Target clock times for one individual event. All-time and meet goals are
+/// independent; either may be unset.
+struct EventGoals: Identifiable, Codable, Hashable {
+    var distance: Int
+    var stroke: Stroke
+    var course: Course
+    /// Career target time for this event.
+    var allTimeSeconds: Double? = nil
+    /// Generic meet target; progress uses best time in the current Aug–Jul season.
+    var meetSeconds: Double? = nil
+
+    var id: String { event.id }
+    var event: SwimEvent { SwimEvent(distance: distance, stroke: stroke, course: course) }
+
+    var hasAnyGoal: Bool { allTimeSeconds != nil || meetSeconds != nil }
+
+    init(event: SwimEvent, allTimeSeconds: Double? = nil, meetSeconds: Double? = nil) {
+        distance = event.distance
+        stroke = event.stroke
+        course = event.course
+        self.allTimeSeconds = allTimeSeconds
+        self.meetSeconds = meetSeconds
+    }
+}
+
+/// School-year season window used for meet-goal progress: August 1 – July 31.
+enum SwimSeason {
+    /// Inclusive start and exclusive end of the Aug–Jul season containing `date`.
+    static func range(containing date: Date = Date(), calendar: Calendar = .current) -> (start: Date, end: Date) {
+        let year = calendar.component(.year, from: date)
+        let month = calendar.component(.month, from: date)
+        let startYear = month >= 8 ? year : year - 1
+        let start = calendar.date(from: DateComponents(year: startYear, month: 8, day: 1))!
+        let end = calendar.date(from: DateComponents(year: startYear + 1, month: 8, day: 1))!
+        return (start, end)
+    }
+
+    /// Short label for the current season, e.g. "2025–26".
+    static func label(containing date: Date = Date(), calendar: Calendar = .current) -> String {
+        let startYear = calendar.component(.year, from: range(containing: date, calendar: calendar).start)
+        let endShort = String(format: "%02d", (startYear + 1) % 100)
+        return "\(startYear)–\(endShort)"
+    }
+
+    static func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
+        let bounds = range(containing: Date(), calendar: calendar)
+        return date >= bounds.start && date < bounds.end
+    }
+}
+
 // MARK: - Store
 
 /// App-wide state. Owns the user's data and persists it to disk as JSON in the
@@ -444,10 +496,16 @@ final class Store {
         didSet { saveSettings() }
     }
 
+    /// Per-event all-time and meet goal times.
+    var goals: [EventGoals] = [] {
+        didSet { saveGoals() }
+    }
+
     @ObservationIgnored private let meetsURL: URL
     @ObservationIgnored private let timesURL: URL
     @ObservationIgnored private let baseTimesURL: URL
     @ObservationIgnored private let settingsURL: URL
+    @ObservationIgnored private let goalsURL: URL
     @ObservationIgnored private var isLoading = false
 
     init() {
@@ -456,6 +514,7 @@ final class Store {
         timesURL = dir.appendingPathComponent("swimtracker.times.v1.json")
         baseTimesURL = dir.appendingPathComponent("swimtracker.basetimes.v1.json")
         settingsURL = dir.appendingPathComponent("swimtracker.settings.v1.json")
+        goalsURL = dir.appendingPathComponent("swimtracker.goals.v1.json")
         load()
     }
 
@@ -466,9 +525,31 @@ final class Store {
         meets.sorted { $0.date > $1.date }
     }
 
-    /// The most recent meets, for the Home page.
+    /// Meets that start today or later, soonest first.
+    func upcomingMeets() -> [Meet] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return meets
+            .filter { calendar.startOfDay(for: $0.date) >= today }
+            .sorted { $0.date < $1.date }
+    }
+
+    /// Past meets (started before today), newest first — for the Home page.
     func recentMeets(limit: Int = 5) -> [Meet] {
-        Array(meetsByDate.prefix(limit))
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let past = meets
+            .filter { calendar.startOfDay(for: $0.date) < today }
+            .sorted { $0.date > $1.date }
+        return Array(past.prefix(limit))
+    }
+
+    /// Whole days from today until the meet's start date (0 = today).
+    func daysUntilMeet(_ meet: Meet) -> Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let start = calendar.startOfDay(for: meet.date)
+        return calendar.dateComponents([.day], from: today, to: start).day ?? 0
     }
 
     /// Creates a meet and returns its id so callers can immediately attach results.
@@ -546,6 +627,54 @@ final class Store {
         recordedTimes(for: event).min {
             ($0.seconds ?? .greatestFiniteMagnitude) < ($1.seconds ?? .greatestFiniteMagnitude)
         }
+    }
+
+    /// Fastest recorded time for an event in the current Aug–Jul season.
+    func bestTimeInCurrentSeason(for event: SwimEvent) -> SwimTime? {
+        recordedTimes(for: event)
+            .filter { SwimSeason.contains($0.date) }
+            .min {
+                ($0.seconds ?? .greatestFiniteMagnitude) < ($1.seconds ?? .greatestFiniteMagnitude)
+            }
+    }
+
+    // MARK: Goals
+
+    /// Goals that have at least one target set, heat-sheet order.
+    var eventsWithGoals: [EventGoals] {
+        goals.filter(\.hasAnyGoal).sorted { $0.event < $1.event }
+    }
+
+    func goals(for event: SwimEvent) -> EventGoals? {
+        goals.first { $0.event == event && $0.hasAnyGoal }
+    }
+
+    /// Sets or clears goals for an event. Clearing both removes the entry.
+    func setGoals(for event: SwimEvent, allTimeSeconds: Double?, meetSeconds: Double?) {
+        let allTime = normalized(allTimeSeconds)
+        let meet = normalized(meetSeconds)
+        var next = goals
+        next.removeAll { $0.event == event }
+        if allTime != nil || meet != nil {
+            next.append(EventGoals(event: event, allTimeSeconds: allTime, meetSeconds: meet))
+        }
+        goals = next
+    }
+
+    func clearGoals(for event: SwimEvent) {
+        setGoals(for: event, allTimeSeconds: nil, meetSeconds: nil)
+    }
+
+    /// Seconds above goal (positive = still to drop). Nil when there is no comparison swim.
+    func goalGap(goalSeconds: Double, bestSeconds: Double?) -> Double? {
+        guard let bestSeconds else { return nil }
+        return bestSeconds - goalSeconds
+    }
+
+    /// True when a comparison swim has matched or beaten the goal.
+    func isGoalMet(goalSeconds: Double, bestSeconds: Double?) -> Bool {
+        guard let bestSeconds else { return false }
+        return bestSeconds <= goalSeconds
     }
 
     /// World Aquatics points for a single recorded swim, using the profile gender
@@ -840,6 +969,10 @@ final class Store {
         var overrides: [String: Double] = [:]
     }
 
+    private struct GoalsData: Codable {
+        var goals: [EventGoals] = []
+    }
+
     private func load() {
         isLoading = true
         defer { isLoading = false }
@@ -863,6 +996,13 @@ final class Store {
            let decoded = try? JSONDecoder.swimTracker.decode(AppSettings.self, from: data) {
             settings = decoded
         }
+
+        if let data = try? Data(contentsOf: goalsURL),
+           let decoded = try? JSONDecoder.swimTracker.decode(GoalsData.self, from: data) {
+            goals = decoded.goals
+        }
+
+        publishGoalsWidgetSnapshot()
     }
 
     private func saveMeets() {
@@ -876,6 +1016,7 @@ final class Store {
         let payload = TimesData(times: times)
         guard let data = try? JSONEncoder.swimTracker.encode(payload) else { return }
         try? data.write(to: timesURL, options: [.atomic])
+        publishGoalsWidgetSnapshot()
     }
 
     private func saveBaseTimes() {
@@ -891,9 +1032,40 @@ final class Store {
         try? data.write(to: settingsURL, options: [.atomic])
     }
 
+    private func saveGoals() {
+        guard !isLoading else { return }
+        let payload = GoalsData(goals: goals)
+        guard let data = try? JSONEncoder.swimTracker.encode(payload) else { return }
+        try? data.write(to: goalsURL, options: [.atomic])
+        publishGoalsWidgetSnapshot()
+    }
+
+    /// Writes a compact goals payload for the Home Screen widget and asks WidgetKit to refresh.
+    func publishGoalsWidgetSnapshot() {
+        let entries = eventsWithGoals.map { entry in
+            GoalsWidgetEntry(
+                id: entry.id,
+                eventName: entry.event.name,
+                course: entry.course.rawValue,
+                allTimeGoal: entry.allTimeSeconds,
+                allTimeBest: bestTime(for: entry.event)?.seconds,
+                meetGoal: entry.meetSeconds,
+                seasonBest: bestTimeInCurrentSeason(for: entry.event)?.seconds
+            )
+        }
+        GoalsWidgetStore.save(
+            GoalsWidgetSnapshot(
+                updatedAt: Date(),
+                seasonLabel: SwimSeason.label(),
+                entries: entries
+            )
+        )
+        WidgetBridge.reloadGoals()
+    }
+
     // MARK: Backup (import / export)
 
-    /// Bundles meets, times, base-time overrides, and settings into one JSON file.
+    /// Bundles meets, times, base-time overrides, settings, and goals into one JSON file.
     func exportBackup() throws -> Data {
         let backup = SwimTrackerBackup(
             formatVersion: SwimTrackerBackup.currentFormatVersion,
@@ -901,7 +1073,8 @@ final class Store {
             meets: meets,
             times: times,
             baseTimeOverrides: baseTimeOverrides,
-            settings: settings
+            settings: settings,
+            goals: goals
         )
         return try JSONEncoder.swimTrackerPretty.encode(backup)
     }
@@ -925,12 +1098,14 @@ final class Store {
         times = backup.times
         baseTimeOverrides = backup.baseTimeOverrides
         settings = backup.settings
+        goals = backup.goals
         isLoading = false
 
         saveMeets()
         saveTimes()
         saveBaseTimes()
         saveSettings()
+        saveGoals()
     }
 }
 
@@ -944,6 +1119,40 @@ struct SwimTrackerBackup: Codable {
     var times: [SwimTime]
     var baseTimeOverrides: [String: Double]
     var settings: AppSettings
+    var goals: [EventGoals]
+
+    enum CodingKeys: String, CodingKey {
+        case formatVersion, exportedAt, meets, times, baseTimeOverrides, settings, goals
+    }
+
+    init(
+        formatVersion: Int,
+        exportedAt: Date,
+        meets: [Meet],
+        times: [SwimTime],
+        baseTimeOverrides: [String: Double],
+        settings: AppSettings,
+        goals: [EventGoals] = []
+    ) {
+        self.formatVersion = formatVersion
+        self.exportedAt = exportedAt
+        self.meets = meets
+        self.times = times
+        self.baseTimeOverrides = baseTimeOverrides
+        self.settings = settings
+        self.goals = goals
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        formatVersion = try container.decode(Int.self, forKey: .formatVersion)
+        exportedAt = try container.decode(Date.self, forKey: .exportedAt)
+        meets = try container.decode([Meet].self, forKey: .meets)
+        times = try container.decode([SwimTime].self, forKey: .times)
+        baseTimeOverrides = try container.decodeIfPresent([String: Double].self, forKey: .baseTimeOverrides) ?? [:]
+        settings = try container.decodeIfPresent(AppSettings.self, forKey: .settings) ?? AppSettings()
+        goals = try container.decodeIfPresent([EventGoals].self, forKey: .goals) ?? []
+    }
 }
 
 enum BackupError: LocalizedError {
