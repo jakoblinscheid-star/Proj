@@ -360,6 +360,14 @@ enum SwimScore {
         guard value.isFinite, value >= 0 else { return nil }
         return Int(value)
     }
+
+    /// Swim time for a World Aquatics score: `base ÷ ∛(points ÷ 1000)`.
+    static func seconds(points: Int, base: Double) -> Double? {
+        guard points > 0, base > 0 else { return nil }
+        let seconds = base / pow(Double(points) / 1000.0, 1.0 / 3.0)
+        guard seconds.isFinite, seconds > 0 else { return nil }
+        return seconds
+    }
 }
 
 // MARK: - Overall score
@@ -377,7 +385,7 @@ struct ScoreComponent: Identifiable, Hashable {
 /// A weighted overall built from a swimmer's best events, Swimcloud-style: a
 /// weighted average of the top events (0.4 / 0.4 / 0.15 / 0.05), renormalised
 /// when fewer than four events exist so one event equals its own score.
-struct OverallScore {
+struct OverallScore: Hashable {
     let value: Int
     /// The events that fed the overall, best-scoring first.
     let components: [ScoreComponent]
@@ -399,6 +407,16 @@ struct YearlyScore: Identifiable {
     let value: Int
 
     var id: Int { year }
+}
+
+/// Overall score scoped to a single stroke, for the Home radar chart.
+struct StrokeScore: Identifiable, Hashable {
+    let stroke: Stroke
+    let overall: OverallScore
+
+    var id: String { stroke.id }
+    var value: Int { overall.value }
+    var isEmpty: Bool { overall.isEmpty }
 }
 
 // MARK: - Store
@@ -685,6 +703,16 @@ final class Store {
                 return overall.isEmpty ? nil : YearlyScore(year: year, value: overall.value)
             }
             .sorted { $0.year < $1.year }
+    }
+
+    /// Overall score for every stroke (Free / Back / Breast / Fly / IM), heat-sheet
+    /// order. Strokes with no scored swims still appear with an empty overall (0)
+    /// so the Home radar always has five axes.
+    var strokeOveralls: [StrokeScore] {
+        Stroke.allCases.map { stroke in
+            let scoped = times.filter { !$0.isRelay && $0.stroke == stroke && $0.seconds != nil }
+            return StrokeScore(stroke: stroke, overall: overallScore(for: scoped))
+        }
     }
 
     func addTime(

@@ -272,15 +272,23 @@ struct ScoreView: View {
 
 // MARK: - Calc score
 
-/// Hypothetical World Aquatics points for an event + time (does not save a swim).
+/// Hypothetical World Aquatics conversion: time → points or points → approximate time.
 struct CalcScoreView: View {
     @Environment(Store.self) private var store
 
+    enum Direction: String, CaseIterable, Identifiable {
+        case timeToScore = "Time → Score"
+        case scoreToTime = "Score → Time"
+        var id: String { rawValue }
+    }
+
+    @State private var direction: Direction = .timeToScore
     @State private var gender: Gender = .male
     @State private var course: Course = .scy
     @State private var stroke: Stroke = .freestyle
     @State private var distance: Int = 100
     @State private var timeSeconds = 0.0
+    @State private var scoreInput = ""
     @State private var didApplyDefaults = false
 
     private var availableStrokes: [Stroke] {
@@ -300,6 +308,12 @@ struct CalcScoreView: View {
 
     private var totalSeconds: Double { timeSeconds }
 
+    private var parsedScore: Int? {
+        let trimmed = scoreInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let value = Int(trimmed), value > 0 else { return nil }
+        return value
+    }
+
     private var baseSeconds: Double? {
         store.baseSeconds(for: event, gender: gender)
     }
@@ -309,9 +323,21 @@ struct CalcScoreView: View {
         return SwimScore.points(seconds: totalSeconds, base: base)
     }
 
+    private var calculatedSeconds: Double? {
+        guard let points = parsedScore, let base = baseSeconds else { return nil }
+        return SwimScore.seconds(points: points, base: base)
+    }
+
     var body: some View {
         Form {
             Section {
+                Picker("Direction", selection: $direction) {
+                    ForEach(Direction.allCases) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 Picker("Gender", selection: $gender) {
                     ForEach(Gender.allCases) { option in
                         Text(option.rawValue).tag(option)
@@ -341,44 +367,11 @@ struct CalcScoreView: View {
                 Text("Event")
             }
 
-            Section {
-                SwimTimePad(seconds: $timeSeconds)
-            } header: {
-                Text("Time")
-            }
-
-            Section {
-                if let points = calculatedPoints {
-                    VStack(spacing: 6) {
-                        Text("\(points)")
-                            .font(.system(size: 60, weight: .bold, design: .default))
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.scoreColor(points))
-                        Text("World Aquatics pts")
-                            .font(.headline)
-                        Text("\(gender.rawValue) · \(event.name) · \(totalSeconds.asSwimTime)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                } else if totalSeconds > 0, baseSeconds == nil {
-                    Text("No base time for this event — it can’t be scored.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Pick an event and enter a time.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Score")
-            } footer: {
-                if let base = baseSeconds {
-                    Text("\(gender.rawValue) base time \(base.asSwimTime) = 1000 pts. Formula: 1000 × (base ÷ time)³.")
-                } else {
-                    Text("Uses \(gender.rawValue.lowercased()) World Aquatics / U.S. Open base times (editable under Base Times).")
-                }
+            switch direction {
+            case .timeToScore:
+                timeToScoreSections
+            case .scoreToTime:
+                scoreToTimeSections
             }
         }
         .onChange(of: course) { _, _ in reconcileEventSelection() }
@@ -390,6 +383,97 @@ struct CalcScoreView: View {
                 didApplyDefaults = true
             }
             reconcileEventSelection()
+        }
+    }
+
+    @ViewBuilder
+    private var timeToScoreSections: some View {
+        Section {
+            SwimTimePad(seconds: $timeSeconds)
+        } header: {
+            Text("Time")
+        }
+
+        Section {
+            if let points = calculatedPoints {
+                VStack(spacing: 6) {
+                    Text("\(points)")
+                        .font(.system(size: 60, weight: .bold, design: .default))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.scoreColor(points))
+                    Text("World Aquatics pts")
+                        .font(.headline)
+                    Text("\(gender.rawValue) · \(event.name) · \(totalSeconds.asSwimTime)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            } else if totalSeconds > 0, baseSeconds == nil {
+                Text("No base time for this event — it can’t be scored.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Pick an event and enter a time.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Score")
+        } footer: {
+            formulaFooter
+        }
+    }
+
+    @ViewBuilder
+    private var scoreToTimeSections: some View {
+        Section {
+            TextField("e.g. 505", text: $scoreInput)
+                .keyboardType(.numberPad)
+                .font(.system(size: 40, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+                .padding(.vertical, 4)
+        } header: {
+            Text("Score")
+        }
+
+        Section {
+            if let seconds = calculatedSeconds, let points = parsedScore {
+                VStack(spacing: 6) {
+                    Text(seconds.asSwimTime)
+                        .font(.system(size: 60, weight: .bold, design: .default))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.accent)
+                    Text("Approximate time")
+                        .font(.headline)
+                    Text("\(gender.rawValue) · \(event.name) · \(points) pts")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            } else if parsedScore != nil, baseSeconds == nil {
+                Text("No base time for this event — it can’t be converted.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Pick an event and enter a score.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Time")
+        } footer: {
+            formulaFooter
+        }
+    }
+
+    private var formulaFooter: Text {
+        if let base = baseSeconds {
+            Text("\(gender.rawValue) base time \(base.asSwimTime) = 1000 pts. Formula: 1000 × (base ÷ time)³.")
+        } else {
+            Text("Uses \(gender.rawValue.lowercased()) World Aquatics / U.S. Open base times (editable under Base Times).")
         }
     }
 

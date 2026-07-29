@@ -1,17 +1,21 @@
 import SwiftUI
 
-/// Landing tab: a friendly header plus your most recent meets.
+/// Landing tab: stroke radar from overall scores, plus your most recent meets.
 struct HomeView: View {
     @Environment(Store.self) private var store
     @State private var showingSettings = false
 
+    private var strokeScores: [StrokeScore] { store.strokeOveralls }
+    private var hasStrokeScores: Bool { strokeScores.contains { !$0.isEmpty } }
+    private var hasContent: Bool { hasStrokeScores || !store.meets.isEmpty }
+
     var body: some View {
         NavigationStack {
             Group {
-                if store.meets.isEmpty {
-                    emptyState
-                } else {
+                if hasContent {
                     content
+                } else {
+                    emptyState
                 }
             }
             .navigationTitle("SwimTracker")
@@ -35,14 +39,27 @@ struct HomeView: View {
 
     private var content: some View {
         List {
-            Section {
-                ForEach(store.recentMeets()) { meet in
-                    NavigationLink(value: meet) {
-                        MeetRowView(meet: meet)
-                    }
+            if hasStrokeScores {
+                Section {
+                    StrokeRadarChart(scores: strokeScores)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                } header: {
+                    Text("By stroke")
+                } footer: {
+                    Text("Overall score for each stroke — same weighted average as Your Score, scoped to that stroke.")
                 }
-            } header: {
-                Text("Recent meets")
+            }
+
+            if !store.meets.isEmpty {
+                Section {
+                    ForEach(store.recentMeets()) { meet in
+                        NavigationLink(value: meet) {
+                            MeetRowView(meet: meet)
+                        }
+                    }
+                } header: {
+                    Text("Recent meets")
+                }
             }
         }
         .listStyle(.insetGrouped)
@@ -50,9 +67,9 @@ struct HomeView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("No meets yet", systemImage: "figure.pool.swim")
+            Label("No swims yet", systemImage: "figure.pool.swim")
         } description: {
-            Text("Add a meet in the Meets tab and your most recent ones will show up here.")
+            Text("Add times or meets and your stroke scores will show up here.")
         }
     }
 }

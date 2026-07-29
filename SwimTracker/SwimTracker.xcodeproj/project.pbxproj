@@ -28,6 +28,7 @@
 		3B0000000000000000000014 /* MeetEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000014 /* MeetEditView.swift */; };
 		3B0000000000000000000015 /* MeetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000015 /* MeetDetailView.swift */; };
 		3B0000000000000000000016 /* ResultEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000016 /* ResultEntryView.swift */; };
+		3B0000000000000000000017 /* RadarChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000017 /* RadarChartView.swift */; };
 		3B0000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000009 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -54,6 +55,7 @@
 		2B0000000000000000000014 /* MeetEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetEditView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000015 /* MeetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetDetailView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000016 /* ResultEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultEntryView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000017 /* RadarChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadarChartView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -108,6 +110,7 @@
 				2B0000000000000000000014 /* MeetEditView.swift */,
 				2B0000000000000000000015 /* MeetDetailView.swift */,
 				2B0000000000000000000016 /* ResultEntryView.swift */,
+				2B0000000000000000000017 /* RadarChartView.swift */,
 				2B0000000000000000000009 /* Assets.xcassets */,
 			);
 			path = SwimTracker;
@@ -203,6 +206,7 @@
 				3B0000000000000000000014 /* MeetEditView.swift in Sources */,
 				3B0000000000000000000015 /* MeetDetailView.swift in Sources */,
 				3B0000000000000000000016 /* ResultEntryView.swift in Sources */,
+				3B0000000000000000000017 /* RadarChartView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
