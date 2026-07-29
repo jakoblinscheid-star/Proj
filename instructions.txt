@@ -1,7 +1,0 @@
-Confirm you have the extracted SwimTracker-unsigned.ipa (done).
-Install Apple's standalone iTunes + iCloud from apple.com (Windows only).
-Install AltServer on the PC.
-Plug in the iPhone over USB, trust the computer, and use AltServer to install AltStore onto the phone (sign in with your free Apple ID here).
-In AltStore on the phone, install your SwimTracker-unsigned.ipa.
-On the phone, Settings → General → VPN & Device Management → trust your Apple ID cert, then open the app.
-Keep AltServer running on the PC so it can refresh over Wi-Fi before the 7-day clock runs out.
