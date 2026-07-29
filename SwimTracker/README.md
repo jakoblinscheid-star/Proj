@@ -1,96 +1,77 @@
 # SwimTracker — native iOS app
 
-A personal tracker for your swim times, built as a native SwiftUI app. Four tabs:
+Personal tracker for swim times, meets, scores, and goals. Built with SwiftUI.
+See the [repo root README](../README.md) for the full feature overview.
 
-- **Home** — your most recent meets at a glance.
-- **Times** — your best time in every event, with an automatic swim score. Sort by
-  swim score or by event; tap an event to see all your times and a progression graph.
-- **Meets** — the meets you've competed in, the team you swam for, and the events
-  you swam there (individual + relays), with times you can add now or fill in later.
-- **Score** — scoring *(details TBD)*.
+## Tabs
+
+- **Home** — upcoming meets, stroke radar (overall score per stroke), recent meets.
+- **Times** — best time per event with World Aquatics points; event detail has
+  history, splits, and a progression graph. Goals (all-time / meet) open from here.
+- **Meets** — meet name, team, location, date; individual and relay events with
+  times now or later. Individual results sync into Times.
+- **Score** — weighted overall, top events, by-team scores, year / season
+  progression chart, and a time ↔ points calculator.
+- **Convert** — SCY ↔ SCM ↔ LCM (Colorado Timing factors).
+
+### Times & scoring
+
+Events are distance + stroke + **course** (SCY / SCM / LCM). The list shows your
+**best** time per event.
+
+Points use `P = 1000 × (base ÷ time)³`. Bases: World Aquatics for SCM/LCM, U.S.
+Open for SCY. Gender for “Your Score” and badges is set in Settings; Calc can
+score either gender. Edit bases under Base Times in the Score tab.
+
+Overall score = weighted average of your best four individual events
+(**40% / 40% / 15% / 5%**, renormalized if fewer). Year chart points use only
+that year’s swims; season chart is monthly season-to-date from each August.
 
 ### Meets
 
-Creating a meet captures its name, the **team you're swimming under**, location, and
-date. You can add the **events you swam** — individual events *and* relays — right
-then, or open the meet later and add them. Each event can have a time now or be left
-blank and filled in afterward. Individual events recorded at a meet flow into the
-**Times** tab automatically (linked back to the meet); relays are tracked per-meet.
+Creating a meet captures name, **team**, location, and date. Add individual and
+relay events then or later. Relays stay per-meet; individual times feed Times
+(linked to the meet).
 
-### Times & swim score
+### Goals & widget
 
-Times are organized by **event** — a distance + stroke in a specific **course**
-(SCY yards, SCM meters, LCM meters), tracked separately since each course has its
-own records. The list shows only your **best** time per event; tapping an event
-opens all of its times plus a progression chart.
-
-Each time gets a **swim score** using the World Aquatics ("FINA") point formula
-`P = 1000 × (base ÷ time)³`. The base ("1000-point") times are baked in:
-World Aquatics world-record base times for **SCM/LCM** and **U.S. Open records**
-for **SCY**, for both men and women (toggle whose base times to use from the
-person icon in the Times tab). Update the values in `BaseTimes` (in `Models.swift`)
-whenever new records are set.
-
-All data stays on device (saved as JSON in the app's Documents directory) — no
-accounts, no servers. Sibling to the [`TabTrackApp`](../TabTrackApp) project and
-built the same way: authored on Windows, compiled and sideloaded from a Mac using
-the auto-resign toolchain in the repo's [`mac/`](../mac) folder.
+Per-event all-time and meet goal times. The **SwimTrackerWidget** shows goal
+progress via an App Group shared with the app.
 
 ## Requirements
 
-- A **Mac** with **Xcode 15 or newer** (iOS 17 SDK).
-- A free **Apple ID** added to Xcode (Settings → Accounts).
-- An iPhone running **iOS 17+**, connected via USB and trusted.
-
-> Xcode only runs on macOS. This project is authored on Windows; copy/clone the repo
-> to your Mac to build it.
+- Mac with **Xcode 15+** (iOS 17 SDK)
+- Free **Apple ID** in Xcode
+- iPhone on **iOS 17+**
 
 ## Project layout
 
 ```
 SwimTracker/
-├─ SwimTracker.xcodeproj/       # the Xcode project (shared "SwimTracker" scheme)
+├─ SwimTracker.xcodeproj/       # shared "SwimTracker" scheme
 ├─ SwimTracker/
-│  ├─ Shared/                   # App Group + goals widget snapshot (app + widget)
-│  ├─ SwimTrackerApp.swift      # @main app entry point
-│  ├─ Models.swift              # Meet/SwimTime/goals models, scoring, persistent Store
-│  ├─ GoalsView.swift           # Goals page (from Times)
-│  └─ …
-└─ SwimTrackerWidget/           # Home Screen Goals widget (WidgetKit)
+│  ├─ Shared/                   # App Group + goals widget snapshot
+│  ├─ SwimTrackerApp.swift      # @main
+│  ├─ Models.swift              # models, scoring, persistent Store
+│  └─ …                         # tab and feature views
+└─ SwimTrackerWidget/           # Home Screen Goals widget
 ```
 
-## Build & run on your phone (first time)
+## Build & run (first time)
 
-1. On your Mac, open **`SwimTracker/SwimTracker.xcodeproj`** in Xcode.
-2. Select the **SwimTracker** target → **Signing & Capabilities**:
-   - Check **Automatically manage signing**.
-   - Set **Team** to your Apple ID (free personal team is fine).
-   - Change the **Bundle Identifier** from `com.yourname.swimtracker` to something
-     unique to you (e.g. `com.<yourname>.swimtracker`).
-   - Under **App Groups**, enable `group.com.yourname.swimtracker` (or create a matching
-     `group.<your-bundle-id>` and update both entitlements + `AppGroup.identifier`).
-   - Repeat signing / App Groups for the **SwimTrackerWidget** target (bundle id should
-     stay `<app-bundle-id>.widget`).
-3. Plug in your iPhone and pick it as the run destination (top toolbar).
-4. Press **⌘R** to build & run. The app installs on your phone.
-5. First launch: on the iPhone go to **Settings → General → VPN & Device Management**,
-   tap your developer profile, and **Trust** it. Reopen the app.
-6. Add the widget: long-press the Home Screen → **+** → search **SwimTracker** / **Goals**.
-
-## Keeping it alive past 7 days
-
-Free Apple ID signatures expire after 7 days. To auto re-sign, point the scripts in
-[`mac/`](../mac) at this project (`PROJECT=".../SwimTracker/SwimTracker.xcodeproj"`,
-`SCHEME="SwimTracker"`) and follow the steps in the [root README](../README.md).
+1. Open **`SwimTracker.xcodeproj`** in Xcode.
+2. **SwimTracker** target → **Signing & Capabilities**:
+   - **Automatically manage signing**, set **Team**.
+   - Unique **Bundle Identifier** (e.g. `com.<yourname>.swimtracker`).
+   - **App Groups**: `group.<your-bundle-id>` (keep entitlements and
+     `AppGroup.identifier` in sync).
+   - Same for **SwimTrackerWidget** (`<app-bundle-id>.widget`).
+3. Plug in the iPhone, select it, **⌘R**.
+4. Trust the developer profile under **Settings → General → VPN & Device Management**.
+5. Add the widget from the Home Screen **+** menu if you want it.
 
 ## Your data
 
-Everything is stored locally inside the app's Documents directory: meets in
-`swimtracker.v1.json` and your recorded times (plus the chosen gender) in
-`swimtracker.times.v1.json`. It stays on the device and is included in encrypted
-device backups. Deleting the app deletes the data.
-
-## Status
-
-Home, Meets, and **Times** are functional. **Score** is a clean placeholder,
-waiting on its per-tab design.
+Local JSON in the app Documents directory (meets, times, goals, settings). No
+accounts or servers. Included in encrypted device backups; deleting the app
+deletes the data.

@@ -1,6 +1,25 @@
 import Foundation
 import Observation
 
+/// Heat session for a result at a prelims/finals meet.
+enum MeetRound: String, Codable, CaseIterable, Identifiable {
+    case prelims = "Prelims"
+    case finals = "Finals"
+
+    var id: String { rawValue }
+
+    /// Compact label for list rows, e.g. "Prelim" / "Final".
+    var shortLabel: String {
+        switch self {
+        case .prelims: return "Prelim"
+        case .finals: return "Final"
+        }
+    }
+
+    /// Stable ordering: prelims before finals.
+    var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+}
+
 /// A swim meet you competed in. The events you swam are stored as `SwimTime`s that
 /// reference the meet by `id` (see `Store.results(forMeet:)`).
 struct Meet: Identifiable, Codable, Hashable {
@@ -15,6 +34,8 @@ struct Meet: Identifiable, Codable, Hashable {
     var endDate: Date = Date()
     /// Pool length / course for every event at this meet.
     var course: Course = .scy
+    /// When true, results at this meet can be tagged Prelims or Finals.
+    var hasPrelimsFinals: Bool = false
 
     /// Inclusive date range label, e.g. "Jul 1, 2026" or "Jul 1–3, 2026".
     var dateRangeLabel: String {
@@ -211,6 +232,8 @@ struct SwimTime: Identifiable, Codable, Hashable {
     var meetID: String? = nil
     var isRelay: Bool = false
     var note: String = ""
+    /// Prelims or Finals when the linked meet uses prelims/finals. Nil otherwise.
+    var round: MeetRound? = nil
     /// Which leg you swam (1–4). Nil for individual swims.
     var relayLeg: Int? = nil
     /// Stroke for that leg (required for medley; free relays use freestyle).
@@ -234,7 +257,9 @@ struct SwimTime: Identifiable, Codable, Hashable {
 // extensions preserves each struct's memberwise initializer.
 
 extension Meet {
-    enum CodingKeys: String, CodingKey { case id, name, team, location, date, endDate, course }
+    enum CodingKeys: String, CodingKey {
+        case id, name, team, location, date, endDate, course, hasPrelimsFinals
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -245,12 +270,13 @@ extension Meet {
         date = try container.decodeIfPresent(Date.self, forKey: .date) ?? Date()
         endDate = try container.decodeIfPresent(Date.self, forKey: .endDate) ?? date
         course = try container.decodeIfPresent(Course.self, forKey: .course) ?? .scy
+        hasPrelimsFinals = try container.decodeIfPresent(Bool.self, forKey: .hasPrelimsFinals) ?? false
     }
 }
 
 extension SwimTime {
     enum CodingKeys: String, CodingKey {
-        case id, distance, stroke, course, seconds, splits, date, meetID, isRelay, note
+        case id, distance, stroke, course, seconds, splits, date, meetID, isRelay, note, round
         case relayLeg, relayLegStroke, relayLegSeconds, isRelayLeadOff
     }
 
@@ -266,6 +292,7 @@ extension SwimTime {
         meetID = try container.decodeIfPresent(String.self, forKey: .meetID)
         isRelay = try container.decodeIfPresent(Bool.self, forKey: .isRelay) ?? false
         note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
+        round = try container.decodeIfPresent(MeetRound.self, forKey: .round)
         relayLeg = try container.decodeIfPresent(Int.self, forKey: .relayLeg)
         relayLegStroke = try container.decodeIfPresent(Stroke.self, forKey: .relayLegStroke)
         relayLegSeconds = try container.decodeIfPresent(Double.self, forKey: .relayLegSeconds)
@@ -281,6 +308,7 @@ struct ResultDraft: Identifiable {
     var seconds: Double?
     var note: String
     var splits: [Double] = []
+    var round: MeetRound? = nil
     var relayLeg: Int? = nil
     var relayLegStroke: Stroke? = nil
     var relayLegSeconds: Double? = nil
@@ -401,12 +429,14 @@ struct TeamOverall: Identifiable {
     var id: String { team }
 }
 
-/// A per-year overall, for the progression graph.
-struct YearlyScore: Identifiable {
-    let year: Int
+/// One point on the Score tab progression chart (calendar year or season month).
+struct ProgressionScore: Identifiable {
+    let periodStart: Date
     let value: Int
+    /// Short axis label, e.g. "2025" or "Aug '25".
+    let label: String
 
-    var id: Int { year }
+    var id: TimeInterval { periodStart.timeIntervalSinceReferenceDate }
 }
 
 /// Overall score scoped to a single stroke, for the Home radar chart.
@@ -554,7 +584,15 @@ final class Store {
 
     /// Creates a meet and returns its id so callers can immediately attach results.
     @discardableResult
-    func addMeet(name: String, team: String, location: String, date: Date, endDate: Date, course: Course) -> String? {
+    func addMeet(
+        name: String,
+        team: String,
+        location: String,
+        date: Date,
+        endDate: Date,
+        course: Course,
+        hasPrelimsFinals: Bool = false
+    ) -> String? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let start = date
@@ -564,12 +602,22 @@ final class Store {
                         location: location.trimmingCharacters(in: .whitespacesAndNewlines),
                         date: start,
                         endDate: end,
-                        course: course)
+                        course: course,
+                        hasPrelimsFinals: hasPrelimsFinals)
         meets.append(meet)
         return meet.id
     }
 
-    func updateMeet(id: String, name: String, team: String, location: String, date: Date, endDate: Date, course: Course) {
+    func updateMeet(
+        id: String,
+        name: String,
+        team: String,
+        location: String,
+        date: Date,
+        endDate: Date,
+        course: Course,
+        hasPrelimsFinals: Bool
+    ) {
         guard let index = meets.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -577,18 +625,21 @@ final class Store {
         let end = max(endDate, start)
         let dateChanged = meets[index].date != start
         let courseChanged = meets[index].course != course
+        let prelimsFinalsCleared = meets[index].hasPrelimsFinals && !hasPrelimsFinals
         meets[index].name = trimmed
         meets[index].team = team.trimmingCharacters(in: .whitespacesAndNewlines)
         meets[index].location = location.trimmingCharacters(in: .whitespacesAndNewlines)
         meets[index].date = start
         meets[index].endDate = end
         meets[index].course = course
+        meets[index].hasPrelimsFinals = hasPrelimsFinals
 
-        // Keep results in sync with the meet date / course.
-        if dateChanged || courseChanged {
+        // Keep results in sync with the meet date / course / round mode.
+        if dateChanged || courseChanged || prelimsFinalsCleared {
             for i in times.indices where times[i].meetID == id {
                 if dateChanged { times[i].date = start }
                 if courseChanged { times[i].course = course }
+                if prelimsFinalsCleared { times[i].round = nil }
             }
         }
     }
@@ -819,19 +870,86 @@ final class Store {
     }
 
     /// Per-year overall for the progression graph. Pass a team to scope it, or nil
-    /// for all times. Each year uses only the swims recorded in that year.
-    func yearlyOveralls(team: String? = nil) -> [YearlyScore] {
+    /// for all times. Each year uses only that year's swims (best times from other
+    /// years never carry over).
+    func yearlyOveralls(team: String? = nil) -> [ProgressionScore] {
+        let scored = scoredTimes(team: team)
+        let calendar = Calendar.current
+        let byYear = Dictionary(grouping: scored) { calendar.component(.year, from: $0.date) }
+        return byYear
+            .compactMap { year, group -> ProgressionScore? in
+                let overall = overallScore(for: group)
+                guard !overall.isEmpty else { return nil }
+                guard let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) else {
+                    return nil
+                }
+                return ProgressionScore(periodStart: start, value: overall.value, label: String(year))
+            }
+            .sorted { $0.periodStart < $1.periodStart }
+    }
+
+    /// Monthly season-to-date overalls for the progression graph. A swimming season
+    /// starts each August; each point is the overall from that season's August
+    /// through the end of the month, so the chart resets to 0 in August.
+    func seasonMonthlyOveralls(team: String? = nil) -> [ProgressionScore] {
+        let scored = scoredTimes(team: team)
+        guard let earliest = scored.map(\.date).min() else { return [] }
+
+        let calendar = Calendar.current
+        let latestSwim = scored.map(\.date).max() ?? earliest
+        let endMonth = max(monthStart(of: latestSwim, calendar: calendar),
+                           monthStart(of: Date(), calendar: calendar))
+
+        // Walk every month from the first swim through now so August resets stay visible.
+        var cursor = monthStart(of: earliest, calendar: calendar)
+        var points: [ProgressionScore] = []
+        let labelFormatter = DateFormatter()
+        labelFormatter.dateFormat = "MMM ''yy"
+
+        while cursor <= endMonth {
+            let seasonBegin = Self.seasonStart(containing: cursor, calendar: calendar)
+            let monthEnd = endOfMonth(containing: cursor, calendar: calendar)
+            let window = scored.filter { $0.date >= seasonBegin && $0.date <= monthEnd }
+            let value = overallScore(for: window).value
+            points.append(
+                ProgressionScore(
+                    periodStart: cursor,
+                    value: value,
+                    label: labelFormatter.string(from: cursor)
+                )
+            )
+            guard let next = calendar.date(byAdding: .month, to: cursor) else { break }
+            cursor = next
+        }
+        return points
+    }
+
+    /// Non-relay timed swims, optionally scoped to a team.
+    private func scoredTimes(team: String?) -> [SwimTime] {
         var scored = times.filter { !$0.isRelay && $0.seconds != nil }
         if let team {
             scored = scored.filter { teamKey(for: $0) == team }
         }
-        let byYear = Dictionary(grouping: scored) { Calendar.current.component(.year, from: $0.date) }
-        return byYear
-            .compactMap { year, group -> YearlyScore? in
-                let overall = overallScore(for: group)
-                return overall.isEmpty ? nil : YearlyScore(year: year, value: overall.value)
-            }
-            .sorted { $0.year < $1.year }
+        return scored
+    }
+
+    /// August 1 of the swimming season that contains `date` (season runs Aug–Jul).
+    static func seasonStart(containing date: Date, calendar: Calendar = .current) -> Date {
+        let year = calendar.component(.year, from: date)
+        let month = calendar.component(.month, from: date)
+        let seasonYear = month >= 8 ? year : year - 1
+        return calendar.date(from: DateComponents(year: seasonYear, month: 8, day: 1))
+            ?? date
+    }
+
+    private func monthStart(of date: Date, calendar: Calendar) -> Date {
+        calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+    }
+
+    private func endOfMonth(containing date: Date, calendar: Calendar) -> Date {
+        let start = monthStart(of: date, calendar: calendar)
+        guard let nextMonth = calendar.date(byAdding: .month, to: start) else { return date }
+        return nextMonth.addingTimeInterval(-1)
     }
 
     /// Overall score for every stroke (Free / Back / Breast / Fly / IM), heat-sheet
@@ -854,11 +972,13 @@ final class Store {
         isRelay: Bool = false,
         note: String,
         splits: [Double] = [],
+        round: MeetRound? = nil,
         relayLeg: Int? = nil,
         relayLegStroke: Stroke? = nil,
         relayLegSeconds: Double? = nil,
         isRelayLeadOff: Bool = false
     ) {
+        let resolvedRound = resolvedRound(round, meetID: meetID)
         let time = SwimTime(distance: distance,
                             stroke: stroke,
                             course: course,
@@ -868,6 +988,7 @@ final class Store {
                             meetID: meetID,
                             isRelay: isRelay,
                             note: note.trimmingCharacters(in: .whitespacesAndNewlines),
+                            round: resolvedRound,
                             relayLeg: isRelay ? relayLeg : nil,
                             relayLegStroke: isRelay ? relayLegStroke : nil,
                             relayLegSeconds: isRelay ? normalized(relayLegSeconds) : nil,
@@ -886,6 +1007,7 @@ final class Store {
         isRelay: Bool,
         note: String,
         splits: [Double] = [],
+        round: MeetRound? = nil,
         relayLeg: Int? = nil,
         relayLegStroke: Stroke? = nil,
         relayLegSeconds: Double? = nil,
@@ -901,10 +1023,17 @@ final class Store {
         times[index].meetID = meetID
         times[index].isRelay = isRelay
         times[index].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        times[index].round = resolvedRound(round, meetID: meetID)
         times[index].relayLeg = isRelay ? relayLeg : nil
         times[index].relayLegStroke = isRelay ? relayLegStroke : nil
         times[index].relayLegSeconds = isRelay ? normalized(relayLegSeconds) : nil
         times[index].isRelayLeadOff = isRelay && isRelayLeadOff
+    }
+
+    /// Round is only kept when the linked meet is a prelims/finals meet.
+    private func resolvedRound(_ round: MeetRound?, meetID: String?) -> MeetRound? {
+        guard let meetID, let meet = meet(id: meetID), meet.hasPrelimsFinals else { return nil }
+        return round
     }
 
     func deleteTime(id: String) {
@@ -919,8 +1048,12 @@ final class Store {
     // MARK: Meet results
 
     /// The events swum at a meet (individual + relay), in heat-sheet order.
+    /// Prelims sort before finals when the same event appears twice.
     func results(forMeet meetID: String) -> [SwimTime] {
-        times.filter { $0.meetID == meetID }.sorted { $0.event < $1.event }
+        times.filter { $0.meetID == meetID }.sorted {
+            if $0.event != $1.event { return $0.event < $1.event }
+            return ($0.round?.order ?? 0) < ($1.round?.order ?? 0)
+        }
     }
 
     /// A recorded event (with or without a time) attached to a meet.
@@ -938,6 +1071,7 @@ final class Store {
                 isRelay: event.isRelay,
                 note: draft.note,
                 splits: draft.splits,
+                round: draft.round,
                 relayLeg: draft.relayLeg,
                 relayLegStroke: draft.relayLegStroke,
                 relayLegSeconds: draft.relayLegSeconds,

@@ -10,6 +10,8 @@ struct ResultEntryView: View {
     /// When set (meet results), course is locked to the meet and cannot be changed.
     let fixedCourse: Course?
     let defaultCourse: Course
+    /// When true, show Prelims / Finals picker (meet uses prelims/finals).
+    let allowsRoundSelection: Bool
     let onSave: (ResultDraft) -> Void
 
     @State private var isRelay: Bool
@@ -19,6 +21,7 @@ struct ResultEntryView: View {
     @State private var timeSeconds: Double
     @State private var splitValues: [Double]
     @State private var note: String
+    @State private var round: MeetRound
     @State private var relayLeg: Int
     @State private var relayLegStroke: Stroke
     @State private var relayLegSeconds: Double
@@ -28,11 +31,13 @@ struct ResultEntryView: View {
         draft: ResultDraft?,
         fixedCourse: Course? = nil,
         defaultCourse: Course = .scy,
+        allowsRoundSelection: Bool = false,
         onSave: @escaping (ResultDraft) -> Void
     ) {
         self.draft = draft
         self.fixedCourse = fixedCourse
         self.defaultCourse = defaultCourse
+        self.allowsRoundSelection = allowsRoundSelection
         self.onSave = onSave
         let event = draft?.event
         let initialDistance = event?.distance ?? 100
@@ -56,6 +61,7 @@ struct ResultEntryView: View {
         }
         _splitValues = State(initialValue: initialSplits)
         _note = State(initialValue: draft?.note ?? "")
+        _round = State(initialValue: draft?.round ?? .prelims)
         let leg = draft?.relayLeg ?? 1
         _relayLeg = State(initialValue: leg)
         let defaultLegStroke = event?.stroke == .medley
@@ -123,6 +129,15 @@ struct ResultEntryView: View {
                     ForEach(availableDistances, id: \.self) { distance in
                         Text(distanceLabel(distance)).tag(distance)
                     }
+                }
+
+                if allowsRoundSelection {
+                    Picker("Round", selection: $round) {
+                        ForEach(MeetRound.allCases) { meetRound in
+                            Text(meetRound.rawValue).tag(meetRound)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
             }
 
@@ -259,6 +274,7 @@ struct ResultEntryView: View {
         saved.seconds = timeSeconds > 0 ? timeSeconds : nil
         saved.note = note
         saved.splits = splitValues
+        saved.round = allowsRoundSelection ? round : nil
         if isRelay {
             saved.relayLeg = relayLeg
             saved.relayLegStroke = stroke == .medley ? relayLegStroke : .freestyle

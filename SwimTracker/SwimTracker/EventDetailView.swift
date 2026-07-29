@@ -158,10 +158,14 @@ struct EventDetailView: View {
     }
 
     private func bestSubtitle(_ best: SwimTime) -> String {
+        var parts = [best.date.asShortDate]
         if let meetName = store.meetName(for: best) {
-            return "\(best.date.asShortDate) · \(meetName)"
+            parts.append(meetName)
         }
-        return best.date.asShortDate
+        if let round = best.round {
+            parts.append(round.shortLabel)
+        }
+        return parts.joined(separator: " · ")
     }
 
     /// Time dropped from the first recorded swim to the best swim (if improved).
@@ -314,9 +318,13 @@ struct TimeRowView: View {
     }
 
     private var subtitle: String {
+        var parts = [time.date.asShortDate]
         if let meetName = store.meetName(for: time) {
-            return "\(time.date.asShortDate) · \(meetName)"
+            parts.append(meetName)
         }
-        return time.date.asShortDate
+        if let round = time.round {
+            parts.append(round.shortLabel)
+        }
+        return parts.joined(separator: " · ")
     }
 }

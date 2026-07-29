@@ -115,6 +115,9 @@ struct MeetRowView: View {
     private var subtitle: String {
         var parts = [meet.team, meet.location].filter { !$0.isEmpty }
         parts.append(meet.course.rawValue)
+        if meet.hasPrelimsFinals {
+            parts.append("P/F")
+        }
         return parts.joined(separator: " · ")
     }
 

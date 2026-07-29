@@ -25,6 +25,7 @@ struct MeetEditView: View {
     @State private var date: Date
     @State private var endDate: Date
     @State private var course: Course
+    @State private var hasPrelimsFinals: Bool
     @State private var drafts: [ResultDraft] = []
     @State private var showingEventEntry = false
     @State private var editingDraftID: String? = nil
@@ -39,6 +40,7 @@ struct MeetEditView: View {
             _date = State(initialValue: Date())
             _endDate = State(initialValue: Date())
             _course = State(initialValue: .scy)
+            _hasPrelimsFinals = State(initialValue: false)
         case .edit(let meet):
             _name = State(initialValue: meet.name)
             _team = State(initialValue: meet.team)
@@ -46,6 +48,7 @@ struct MeetEditView: View {
             _date = State(initialValue: meet.date)
             _endDate = State(initialValue: meet.endDate)
             _course = State(initialValue: meet.course)
+            _hasPrelimsFinals = State(initialValue: meet.hasPrelimsFinals)
         }
     }
 
@@ -61,7 +64,7 @@ struct MeetEditView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Meet") {
+                Section {
                     TextField("Name", text: $name)
                     TextField("Team you're swimming for", text: $team)
                     TextField("Location", text: $location)
@@ -73,6 +76,14 @@ struct MeetEditView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+
+                    Toggle("Prelims / Finals", isOn: $hasPrelimsFinals)
+                } header: {
+                    Text("Meet")
+                } footer: {
+                    if hasPrelimsFinals {
+                        Text("Events at this meet can be tagged as Prelims or Finals.")
+                    }
                 }
 
                 if isAdding {
@@ -94,9 +105,21 @@ struct MeetEditView: View {
                 ResultEntryView(
                     draft: editingDraft,
                     fixedCourse: course,
-                    defaultCourse: course
+                    defaultCourse: course,
+                    allowsRoundSelection: hasPrelimsFinals
                 ) { draft in
                     applyDraft(draft)
+                }
+            }
+            .onChange(of: hasPrelimsFinals) { _, enabled in
+                if !enabled {
+                    for index in drafts.indices {
+                        drafts[index].round = nil
+                    }
+                } else {
+                    for index in drafts.indices where drafts[index].round == nil {
+                        drafts[index].round = .prelims
+                    }
                 }
             }
             .onAppear {
@@ -151,6 +174,7 @@ struct MeetEditView: View {
     private func applyDraft(_ draft: ResultDraft) {
         var saved = draft
         saved.event.course = course
+        saved.round = hasPrelimsFinals ? (draft.round ?? .prelims) : nil
         if let editingDraftID, let index = drafts.firstIndex(where: { $0.id == editingDraftID }) {
             drafts[index] = saved
         } else {
@@ -167,7 +191,8 @@ struct MeetEditView: View {
                 location: location,
                 date: date,
                 endDate: endDate,
-                course: course
+                course: course,
+                hasPrelimsFinals: hasPrelimsFinals
             ) {
                 for draft in drafts {
                     store.addResult(toMeet: meetID, draft: draft)
@@ -181,7 +206,8 @@ struct MeetEditView: View {
                 location: location,
                 date: date,
                 endDate: endDate,
-                course: course
+                course: course,
+                hasPrelimsFinals: hasPrelimsFinals
             )
         }
         dismiss()
@@ -196,8 +222,8 @@ private struct DraftRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(draft.event.titleWithCourse)
                     .foregroundStyle(.primary)
-                if draft.event.isRelay, let leg = draft.relayLeg {
-                    Text(relaySubtitle(leg: leg))
+                if let subtitle = draftSubtitle {
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -209,7 +235,18 @@ private struct DraftRow: View {
         }
     }
 
-    private func relaySubtitle(leg: Int) -> String {
+    private var draftSubtitle: String? {
+        var parts: [String] = []
+        if let round = draft.round {
+            parts.append(round.shortLabel)
+        }
+        if draft.event.isRelay, let leg = draft.relayLeg {
+            parts.append(contentsOf: relayParts(leg: leg))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func relayParts(leg: Int) -> [String] {
         var parts = ["Leg \(leg)"]
         if let stroke = draft.relayLegStroke, draft.event.stroke == .medley {
             parts.append(stroke.rawValue)
@@ -218,6 +255,6 @@ private struct DraftRow: View {
         if let legTime = draft.relayLegSeconds {
             parts.append("Leg \(legTime.asSwimTime)")
         }
-        return parts.joined(separator: " · ")
+        return parts
     }
 }

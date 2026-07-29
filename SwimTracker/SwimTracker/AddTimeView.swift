@@ -15,6 +15,7 @@ struct AddTimeView: View {
     @State private var splitValues: [Double]
     @State private var date = Date()
     @State private var meetID: String? = nil
+    @State private var round: MeetRound = .prelims
     @State private var note = ""
     @State private var confirmingDelete = false
 
@@ -41,7 +42,13 @@ struct AddTimeView: View {
         _splitValues = State(initialValue: initialSplits)
         _date = State(initialValue: editing?.date ?? Date())
         _meetID = State(initialValue: editing?.meetID)
+        _round = State(initialValue: editing?.round ?? .prelims)
         _note = State(initialValue: editing?.note ?? "")
+    }
+
+    private var selectedMeetAllowsRound: Bool {
+        guard let meetID, let meet = store.meet(id: meetID) else { return false }
+        return meet.hasPrelimsFinals
     }
 
     private var availableStrokes: [Stroke] {
@@ -183,6 +190,15 @@ struct AddTimeView: View {
                 }
             }
 
+            if selectedMeetAllowsRound {
+                Picker("Round", selection: $round) {
+                    ForEach(MeetRound.allCases) { meetRound in
+                        Text(meetRound.rawValue).tag(meetRound)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
             TextField("Note (optional)", text: $note)
         }
     }
@@ -204,6 +220,7 @@ struct AddTimeView: View {
             swimDate = meet.date
             swimCourse = meet.course
         }
+        let swimRound: MeetRound? = selectedMeetAllowsRound ? round : nil
         if let editingID {
             store.updateTime(id: editingID,
                              distance: distance,
@@ -214,7 +231,8 @@ struct AddTimeView: View {
                              meetID: meetID,
                              isRelay: false,
                              note: note,
-                             splits: splitValues)
+                             splits: splitValues,
+                             round: swimRound)
         } else {
             store.addTime(distance: distance,
                           stroke: stroke,
@@ -223,7 +241,8 @@ struct AddTimeView: View {
                           date: swimDate,
                           meetID: meetID,
                           note: note,
-                          splits: splitValues)
+                          splits: splitValues,
+                          round: swimRound)
         }
         dismiss()
     }

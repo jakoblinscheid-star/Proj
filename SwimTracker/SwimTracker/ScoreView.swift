@@ -12,9 +12,16 @@ struct ScoreView: View {
         var id: String { rawValue }
     }
 
+    enum ProgressionRange: String, CaseIterable, Identifiable {
+        case year = "Year"
+        case season = "Season"
+        var id: String { rawValue }
+    }
+
     @State private var mode: Mode = .yourScore
-    /// Scope for overall / top events / year chart: nil = all times, otherwise a team.
+    /// Scope for overall / top events / progression chart: nil = all times, otherwise a team.
     @State private var selectedTeam: String? = nil
+    @State private var progressionRange: ProgressionRange = .year
     @State private var showingBaseTimes = false
     @State private var showingSettings = false
 
@@ -146,9 +153,25 @@ struct ScoreView: View {
 
     // MARK: Progression
 
+    private var progressionData: [ProgressionScore] {
+        switch progressionRange {
+        case .year:
+            return store.yearlyOveralls(team: selectedTeam)
+        case .season:
+            return store.seasonMonthlyOveralls(team: selectedTeam)
+        }
+    }
+
     private var progressionSection: some View {
-        let data = store.yearlyOveralls(team: selectedTeam)
+        let data = progressionData
         return Section {
+            Picker("Range", selection: $progressionRange) {
+                ForEach(ProgressionRange.allCases) { option in
+                    Text(option.rawValue).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+
             if data.isEmpty {
                 Text("No scored swims for this selection yet.")
                     .font(.subheadline)
@@ -157,52 +180,102 @@ struct ScoreView: View {
                 progressionChart(data)
             }
         } header: {
-            Text("Score by year")
+            Text(progressionRange == .year ? "Score by year" : "Score by season")
         } footer: {
             Text(progressionFooter)
         }
     }
 
     private var progressionFooter: String {
-        if let team = selectedTeam {
-            return "Each point is your overall from swims with \(team) that year."
+        let teamScope: String = {
+            if let team = selectedTeam { return " with \(team)" }
+            return ""
+        }()
+        switch progressionRange {
+        case .year:
+            return "Each point is your overall from swims\(teamScope) that calendar year only — later improvements don’t change prior years."
+        case .season:
+            return "Each point is your season-to-date overall from swims\(teamScope) since August. The chart resets to 0 each August."
         }
-        return "Each point is your overall from all swims that year."
     }
 
-    private func progressionChart(_ data: [YearlyScore]) -> some View {
+    private func progressionChart(_ data: [ProgressionScore]) -> some View {
         Chart(data) { point in
             LineMark(
-                x: .value("Year", point.year),
+                x: .value("Period", point.periodStart),
                 y: .value("Score", point.value)
             )
             .foregroundStyle(Theme.accent)
             .interpolationMethod(.monotone)
 
             PointMark(
-                x: .value("Year", point.year),
+                x: .value("Period", point.periodStart),
                 y: .value("Score", point.value)
             )
             .foregroundStyle(Theme.accent)
             .annotation(position: .top) {
-                Text("\(point.value)")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                // Skip labels on long season charts when the value didn’t change,
+                // but always show August resets (0) and year points.
+                if shouldAnnotate(point, in: data) {
+                    Text("\(point.value)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
-        .chartYScale(domain: .automatic(includesZero: false))
+        .chartYScale(domain: seasonYDomain(for: data))
         .chartXAxis {
-            AxisMarks(values: data.map(\.year)) { value in
+            AxisMarks(values: axisValues(for: data)) { value in
                 AxisGridLine()
                 AxisValueLabel {
-                    if let year = value.as(Int.self) {
-                        Text(String(year))
+                    if let date = value.as(Date.self),
+                       let point = data.first(where: { $0.periodStart == date }) {
+                        Text(point.label)
+                            .font(.caption2)
                     }
                 }
             }
         }
         .frame(height: 220)
         .padding(.vertical, 8)
+    }
+
+    /// Season charts pin 0 so August resets are visible; year charts leave room above the data.
+    private func seasonYDomain(for data: [ProgressionScore]) -> ClosedRange<Int> {
+        let peak = data.map(\.value).max() ?? 0
+        if progressionRange == .season {
+            return 0...max(peak, 1)
+        }
+        let floor = data.map(\.value).min() ?? 0
+        let pad = max(1, (peak - floor) / 8)
+        return max(0, floor - pad)...(peak + pad)
+    }
+
+    private func axisValues(for data: [ProgressionScore]) -> [Date] {
+        guard progressionRange == .season, data.count > 8 else {
+            return data.map(\.periodStart)
+        }
+        // Label August (season start) and every third month so the axis stays readable.
+        return data.enumerated().compactMap { index, point in
+            let month = Calendar.current.component(.month, from: point.periodStart)
+            if month == 8 || index == data.count - 1 || index % 3 == 0 {
+                return point.periodStart
+            }
+            return nil
+        }
+    }
+
+    private func shouldAnnotate(_ point: ProgressionScore, in data: [ProgressionScore]) -> Bool {
+        if progressionRange == .year { return true }
+        if point.value == 0 {
+            let month = Calendar.current.component(.month, from: point.periodStart)
+            return month == 8
+        }
+        guard let index = data.firstIndex(where: { $0.periodStart == point.periodStart }) else {
+            return true
+        }
+        if index == 0 { return true }
+        return data[index - 1].value != point.value
     }
 
     // MARK: Top events

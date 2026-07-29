@@ -37,7 +37,8 @@ struct MeetDetailView: View {
                 ResultEntryView(
                     draft: editingDraft,
                     fixedCourse: meet?.course,
-                    defaultCourse: meet?.course ?? store.settings.defaultCourse
+                    defaultCourse: meet?.course ?? store.settings.defaultCourse,
+                    allowsRoundSelection: meet?.hasPrelimsFinals ?? false
                 ) { draft in
                     applyResult(draft)
                 }
@@ -63,6 +64,11 @@ struct MeetDetailView: View {
                 Label(meet.course.label, systemImage: "ruler")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if meet.hasPrelimsFinals {
+                    Label("Prelims / Finals", systemImage: "list.number")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.vertical, 4)
         }
@@ -105,6 +111,7 @@ struct MeetDetailView: View {
             seconds: result.seconds,
             note: result.note,
             splits: result.splits,
+            round: result.round,
             relayLeg: result.relayLeg,
             relayLegStroke: result.relayLegStroke,
             relayLegSeconds: result.relayLegSeconds,
@@ -126,6 +133,7 @@ struct MeetDetailView: View {
                 isRelay: draft.event.isRelay,
                 note: draft.note,
                 splits: draft.splits,
+                round: draft.round,
                 relayLeg: draft.relayLeg,
                 relayLegStroke: draft.relayLegStroke,
                 relayLegSeconds: draft.relayLegSeconds,
@@ -202,6 +210,9 @@ struct ResultRow: View {
 
     private var subtitle: String {
         var parts = [result.event.course.rawValue]
+        if let round = result.round {
+            parts.append(round.shortLabel)
+        }
         if result.isRelay {
             parts.append("Relay")
             if let leg = result.relayLeg {
