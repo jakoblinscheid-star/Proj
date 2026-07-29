@@ -918,7 +918,7 @@ final class Store {
                     label: labelFormatter.string(from: cursor)
                 )
             )
-            guard let next = calendar.date(byAdding: .month, to: cursor) else { break }
+            guard let next = calendar.date(byAdding: DateComponents(month: 1), to: cursor) else { break }
             cursor = next
         }
         return points
@@ -948,7 +948,9 @@ final class Store {
 
     private func endOfMonth(containing date: Date, calendar: Calendar) -> Date {
         let start = monthStart(of: date, calendar: calendar)
-        guard let nextMonth = calendar.date(byAdding: .month, to: start) else { return date }
+        guard let nextMonth = calendar.date(byAdding: DateComponents(month: 1), to: start) else {
+            return date
+        }
         return nextMonth.addingTimeInterval(-1)
     }
 
