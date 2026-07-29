@@ -22,6 +22,8 @@ struct ScoreView: View {
     /// Scope for overall / top events / progression chart: nil = all times, otherwise a team.
     @State private var selectedTeam: String? = nil
     @State private var progressionRange: ProgressionRange = .year
+    /// August calendar year of the selected Aug–Jul season (e.g. 2025 → 25–26).
+    @State private var selectedSeasonStartYear: Int = SwimSeason.startYear()
     @State private var showingBaseTimes = false
     @State private var showingSettings = false
 
@@ -75,6 +77,17 @@ struct ScoreView: View {
             .onChange(of: teams) { _, teams in
                 if let selectedTeam, !teams.contains(selectedTeam) {
                     self.selectedTeam = nil
+                }
+            }
+            .onChange(of: availableSeasonStartYears) { _, years in
+                if !years.contains(selectedSeasonStartYear), let newest = years.first {
+                    selectedSeasonStartYear = newest
+                }
+            }
+            .onChange(of: selectedTeam) { _, _ in
+                let years = availableSeasonStartYears
+                if !years.contains(selectedSeasonStartYear), let newest = years.first {
+                    selectedSeasonStartYear = newest
                 }
             }
         }
@@ -153,12 +166,16 @@ struct ScoreView: View {
 
     // MARK: Progression
 
+    private var availableSeasonStartYears: [Int] {
+        store.availableSeasonStartYears(team: selectedTeam)
+    }
+
     private var progressionData: [ProgressionScore] {
         switch progressionRange {
         case .year:
             return store.yearlyOveralls(team: selectedTeam)
         case .season:
-            return store.seasonMonthlyOveralls(team: selectedTeam)
+            return store.seasonMeetOveralls(team: selectedTeam, seasonStartYear: selectedSeasonStartYear)
         }
     }
 
@@ -172,15 +189,30 @@ struct ScoreView: View {
             }
             .pickerStyle(.segmented)
 
+            if progressionRange == .season {
+                Picker("Season", selection: $selectedSeasonStartYear) {
+                    ForEach(availableSeasonStartYears, id: \.self) { year in
+                        Text(SwimSeason.shortLabel(startYear: year)).tag(year)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
             if data.isEmpty {
-                Text("No scored swims for this selection yet.")
+                Text(progressionRange == .season
+                      ? "No meets in \(SwimSeason.shortLabel(startYear: selectedSeasonStartYear)) yet."
+                      : "No scored swims for this selection yet.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
                 progressionChart(data)
             }
         } header: {
-            Text(progressionRange == .year ? "Score by year" : "Score by season")
+            if progressionRange == .season {
+                Text("Score by season · \(SwimSeason.shortLabel(startYear: selectedSeasonStartYear))")
+            } else {
+                Text("Score by year")
+            }
         } footer: {
             Text(progressionFooter)
         }
@@ -195,7 +227,8 @@ struct ScoreView: View {
         case .year:
             return "Each point is your overall from swims\(teamScope) that calendar year only — later improvements don’t change prior years."
         case .season:
-            return "Each point is your season-to-date overall from swims\(teamScope) since August. The chart resets to 0 each August."
+            let season = SwimSeason.shortLabel(startYear: selectedSeasonStartYear)
+            return "Each point is your \(season) season-to-date overall\(teamScope) at that meet."
         }
     }
 
@@ -214,8 +247,6 @@ struct ScoreView: View {
             )
             .foregroundStyle(Theme.accent)
             .annotation(position: .top) {
-                // Skip labels on long season charts when the value didn’t change,
-                // but always show August resets (0) and year points.
                 if shouldAnnotate(point, in: data) {
                     Text("\(point.value)")
                         .font(.caption2.weight(.semibold))
@@ -252,13 +283,12 @@ struct ScoreView: View {
     }
 
     private func axisValues(for data: [ProgressionScore]) -> [Date] {
+        // Season chart: one tick per meet. Thin labels if the season is crowded.
         guard progressionRange == .season, data.count > 8 else {
             return data.map(\.periodStart)
         }
-        // Label August (season start) and every third month so the axis stays readable.
         return data.enumerated().compactMap { index, point in
-            let month = Calendar.current.component(.month, from: point.periodStart)
-            if month == 8 || index == data.count - 1 || index % 3 == 0 {
+            if index == 0 || index == data.count - 1 || index % 2 == 0 {
                 return point.periodStart
             }
             return nil
@@ -267,14 +297,8 @@ struct ScoreView: View {
 
     private func shouldAnnotate(_ point: ProgressionScore, in data: [ProgressionScore]) -> Bool {
         if progressionRange == .year { return true }
-        if point.value == 0 {
-            let month = Calendar.current.component(.month, from: point.periodStart)
-            return month == 8
-        }
-        guard let index = data.firstIndex(where: { $0.periodStart == point.periodStart }) else {
-            return true
-        }
-        if index == 0 { return true }
+        guard let index = data.firstIndex(where: { $0.id == point.id }) else { return true }
+        if index == 0 || index == data.count - 1 { return true }
         return data[index - 1].value != point.value
     }
 

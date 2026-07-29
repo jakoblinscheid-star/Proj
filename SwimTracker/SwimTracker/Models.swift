@@ -515,14 +515,13 @@ struct TeamOverall: Identifiable {
     var id: String { team }
 }
 
-/// One point on the Score tab progression chart (calendar year or season month).
+/// One point on the Score tab progression chart (calendar year or season meet).
 struct ProgressionScore: Identifiable {
+    let id: String
     let periodStart: Date
     let value: Int
-    /// Short axis label, e.g. "2025" or "Aug '25".
+    /// Short axis label, e.g. "2025" or "Sep 12".
     let label: String
-
-    var id: TimeInterval { periodStart.timeIntervalSinceReferenceDate }
 }
 
 /// Overall score scoped to a single stroke, for the Home radar chart.
@@ -564,21 +563,38 @@ struct EventGoals: Identifiable, Codable, Hashable {
 
 /// School-year season window used for meet-goal progress: August 1 – July 31.
 enum SwimSeason {
-    /// Inclusive start and exclusive end of the Aug–Jul season containing `date`.
-    static func range(containing date: Date = Date(), calendar: Calendar = .current) -> (start: Date, end: Date) {
+    /// Calendar year of the August that opens the Aug–Jul season containing `date`.
+    static func startYear(containing date: Date = Date(), calendar: Calendar = .current) -> Int {
         let year = calendar.component(.year, from: date)
         let month = calendar.component(.month, from: date)
-        let startYear = month >= 8 ? year : year - 1
+        return month >= 8 ? year : year - 1
+    }
+
+    /// Inclusive start and exclusive end of the Aug–Jul season for `startYear`
+    /// (e.g. 2025 → Aug 1 2025 .. Aug 1 2026).
+    static func range(startYear: Int, calendar: Calendar = .current) -> (start: Date, end: Date) {
         let start = calendar.date(from: DateComponents(year: startYear, month: 8, day: 1))!
         let end = calendar.date(from: DateComponents(year: startYear + 1, month: 8, day: 1))!
         return (start, end)
     }
 
-    /// Short label for the current season, e.g. "2025–26".
+    /// Inclusive start and exclusive end of the Aug–Jul season containing `date`.
+    static func range(containing date: Date = Date(), calendar: Calendar = .current) -> (start: Date, end: Date) {
+        range(startYear: startYear(containing: date, calendar: calendar), calendar: calendar)
+    }
+
+    /// Short picker label, e.g. "25–26".
+    static func shortLabel(startYear: Int) -> String {
+        let a = String(format: "%02d", startYear % 100)
+        let b = String(format: "%02d", (startYear + 1) % 100)
+        return "\(a)–\(b)"
+    }
+
+    /// Longer label for the current season, e.g. "2025–26".
     static func label(containing date: Date = Date(), calendar: Calendar = .current) -> String {
-        let startYear = calendar.component(.year, from: range(containing: date, calendar: calendar).start)
-        let endShort = String(format: "%02d", (startYear + 1) % 100)
-        return "\(startYear)–\(endShort)"
+        let year = startYear(containing: date, calendar: calendar)
+        let endShort = String(format: "%02d", (year + 1) % 100)
+        return "\(year)–\(endShort)"
     }
 
     static func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
@@ -1021,45 +1037,68 @@ final class Store {
                 guard let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) else {
                     return nil
                 }
-                return ProgressionScore(periodStart: start, value: overall.value, label: String(year))
+                return ProgressionScore(
+                    id: "year-\(year)",
+                    periodStart: start,
+                    value: overall.value,
+                    label: String(year)
+                )
             }
             .sorted { $0.periodStart < $1.periodStart }
     }
 
-    /// Monthly season-to-date overalls for the progression graph. A swimming season
-    /// starts each August; each point is the overall from that season's August
-    /// through the end of the month, so the chart resets to 0 in August.
-    func seasonMonthlyOveralls(team: String? = nil) -> [ProgressionScore] {
-        let scored = scoredTimes(team: team)
-        guard let earliest = scored.map(\.date).min() else { return [] }
-
+    /// Start years (August year) that have meets or scored swims, newest first.
+    /// Always includes the current season so the picker has a default.
+    func availableSeasonStartYears(team: String? = nil) -> [Int] {
         let calendar = Calendar.current
-        let latestSwim = scored.map(\.date).max() ?? earliest
-        let endMonth = max(monthStart(of: latestSwim, calendar: calendar),
-                           monthStart(of: Date(), calendar: calendar))
+        var years: Set<Int> = [SwimSeason.startYear(containing: Date(), calendar: calendar)]
 
-        // Walk every month from the first swim through now so August resets stay visible.
-        var cursor = monthStart(of: earliest, calendar: calendar)
-        var points: [ProgressionScore] = []
-        let labelFormatter = DateFormatter()
-        labelFormatter.dateFormat = "MMM ''yy"
-
-        while cursor <= endMonth {
-            let seasonBegin = Self.seasonStart(containing: cursor, calendar: calendar)
-            let monthEnd = endOfMonth(containing: cursor, calendar: calendar)
-            let window = scored.filter { $0.date >= seasonBegin && $0.date <= monthEnd }
-            let value = overallScore(for: window).value
-            points.append(
-                ProgressionScore(
-                    periodStart: cursor,
-                    value: value,
-                    label: labelFormatter.string(from: cursor)
-                )
-            )
-            guard let next = calendar.date(byAdding: DateComponents(month: 1), to: cursor) else { break }
-            cursor = next
+        var relevantMeets = meets
+        if let team {
+            relevantMeets = relevantMeets.filter { meetTeamKey(for: $0) == team }
         }
-        return points
+        for meet in relevantMeets {
+            years.insert(SwimSeason.startYear(containing: meet.date, calendar: calendar))
+        }
+        for time in scoredTimes(team: team) {
+            years.insert(SwimSeason.startYear(containing: time.date, calendar: calendar))
+        }
+        return years.sorted(by: >)
+    }
+
+    /// Season-to-date overalls at each meet in one Aug–Jul season. Each point is
+    /// the overall from that season's August through the end of the meet.
+    func seasonMeetOveralls(team: String? = nil, seasonStartYear: Int) -> [ProgressionScore] {
+        let scored = scoredTimes(team: team)
+        let calendar = Calendar.current
+        let bounds = SwimSeason.range(startYear: seasonStartYear, calendar: calendar)
+        let today = calendar.startOfDay(for: Date())
+
+        var relevantMeets = meets.filter { meet in
+            let day = calendar.startOfDay(for: meet.date)
+            return day >= bounds.start && day < bounds.end && day <= today
+        }
+        if let team {
+            relevantMeets = relevantMeets.filter { meetTeamKey(for: $0) == team }
+        }
+        relevantMeets.sort {
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.name < $1.name
+        }
+
+        let labelFormatter = DateFormatter()
+        labelFormatter.dateFormat = "MMM d"
+
+        return relevantMeets.map { meet in
+            let meetEnd = endOfDay(meet.endDate, calendar: calendar)
+            let window = scored.filter { $0.date >= bounds.start && $0.date <= meetEnd }
+            return ProgressionScore(
+                id: "meet-\(meet.id)",
+                periodStart: calendar.startOfDay(for: meet.date),
+                value: overallScore(for: window).value,
+                label: labelFormatter.string(from: meet.date)
+            )
+        }
     }
 
     /// Non-relay timed swims, optionally scoped to a team.
@@ -1071,25 +1110,16 @@ final class Store {
         return scored
     }
 
-    /// August 1 of the swimming season that contains `date` (season runs Aug–Jul).
-    static func seasonStart(containing date: Date, calendar: Calendar = .current) -> Date {
-        let year = calendar.component(.year, from: date)
-        let month = calendar.component(.month, from: date)
-        let seasonYear = month >= 8 ? year : year - 1
-        return calendar.date(from: DateComponents(year: seasonYear, month: 8, day: 1))
-            ?? date
+    /// Team key for a meet, matching `teamKey(for: SwimTime)` ("Unattached" when blank).
+    private func meetTeamKey(for meet: Meet) -> String {
+        let team = meet.team.trimmingCharacters(in: .whitespacesAndNewlines)
+        return team.isEmpty ? Store.unattachedTeam : team
     }
 
-    private func monthStart(of date: Date, calendar: Calendar) -> Date {
-        calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
-    }
-
-    private func endOfMonth(containing date: Date, calendar: Calendar) -> Date {
-        let start = monthStart(of: date, calendar: calendar)
-        guard let nextMonth = calendar.date(byAdding: DateComponents(month: 1), to: start) else {
-            return date
-        }
-        return nextMonth.addingTimeInterval(-1)
+    private func endOfDay(_ date: Date, calendar: Calendar) -> Date {
+        let start = calendar.startOfDay(for: date)
+        guard let next = calendar.date(byAdding: .day, value: 1, to: start) else { return date }
+        return next.addingTimeInterval(-1)
     }
 
     /// Overall score for every stroke (Free / Back / Breast / Fly / IM), heat-sheet
