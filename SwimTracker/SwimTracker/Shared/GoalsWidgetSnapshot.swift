@@ -44,32 +44,75 @@ struct GoalsWidgetEntry: Codable, Hashable, Identifiable {
 }
 
 enum GoalsWidgetStore {
+    private static let defaultsKey = "goalsWidgetSnapshot"
+
+    /// Prefer seconds-since-1970 so app ↔ widget JSON never breaks on ISO-8601
+    /// fractional-second mismatches (a common cause of permanently empty widgets).
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .secondsSince1970
         return encoder
     }()
 
     private static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .secondsSince1970
         return decoder
     }()
 
+    /// True when the App Group container is reachable (required for widget data sharing).
+    static var isSharedContainerAvailable: Bool {
+        AppGroup.containerURL != nil
+    }
+
+    private static var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: AppGroup.identifier)
+    }
+
     static func load() -> GoalsWidgetSnapshot {
+        if let data = sharedDefaults?.data(forKey: defaultsKey),
+           let snapshot = decode(data) {
+            return snapshot
+        }
         guard let url = AppGroup.goalsSnapshotURL,
               let data = try? Data(contentsOf: url),
-              let snapshot = try? decoder.decode(GoalsWidgetSnapshot.self, from: data)
+              let snapshot = decode(data)
         else {
             return .empty
         }
         return snapshot
     }
 
-    static func save(_ snapshot: GoalsWidgetSnapshot) {
-        guard let url = AppGroup.goalsSnapshotURL else { return }
-        guard let data = try? encoder.encode(snapshot) else { return }
-        try? data.write(to: url, options: [.atomic])
+    @discardableResult
+    static func save(_ snapshot: GoalsWidgetSnapshot) -> Bool {
+        guard let data = try? encoder.encode(snapshot) else { return false }
+        var wrote = false
+
+        if let defaults = sharedDefaults {
+            defaults.set(data, forKey: defaultsKey)
+            wrote = true
+        }
+
+        if let url = AppGroup.goalsSnapshotURL {
+            do {
+                try data.write(to: url, options: [.atomic])
+                wrote = true
+            } catch {
+                // Fall through; UserDefaults may still have succeeded.
+            }
+        }
+
+        return wrote
+    }
+
+    private static func decode(_ data: Data) -> GoalsWidgetSnapshot? {
+        if let snapshot = try? decoder.decode(GoalsWidgetSnapshot.self, from: data) {
+            return snapshot
+        }
+        // Migrate snapshots written with the old ISO-8601 date strategy.
+        let legacy = JSONDecoder()
+        legacy.dateDecodingStrategy = .iso8601
+        return try? legacy.decode(GoalsWidgetSnapshot.self, from: data)
     }
 }
 

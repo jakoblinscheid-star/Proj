@@ -5,5 +5,6 @@ import WidgetKit
 enum WidgetBridge {
     static func reloadGoals() {
         WidgetCenter.shared.reloadTimelines(ofKind: GoalsWidgetKind.id)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }

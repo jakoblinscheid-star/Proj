@@ -73,7 +73,13 @@ struct GoalsView: View {
                         }
                     }
                 } footer: {
-                    Text("All-time goals use your overall best. Meet goals use your best in the current season (\(SwimSeason.label()), Aug–Jul).")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("All-time goals use your overall best. Meet goals use your best in the current season (\(SwimSeason.label()), Aug–Jul).")
+                        if !GoalsWidgetStore.isSharedContainerAvailable {
+                            Text("Home Screen Goals widget can’t sync: App Group isn’t available. In Xcode, enable the same App Group on SwimTracker and SwimTrackerWidget (see README). Free Personal Teams often can’t use App Groups.")
+                                .foregroundStyle(.orange)
+                        }
+                    }
                 }
             }
             .listStyle(.insetGrouped)

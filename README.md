@@ -45,8 +45,9 @@ delete the app and the data goes with it.
   score or by event order.
 - Open an event for full history, PR markers, progression charts, and splits.
 - **Opening splits** from longer races are extracted Swimcloud-style (e.g. first
-  50 of a 100 Free counts toward 50 Free). Mid-race flying splits are not used.
-  Extracted performances are derived from the parent swim, not stored twice.
+  50 of a 100 Free counts toward 50 Free; first 50 of a 200 IM counts toward
+  50 Fly). Mid-race flying splits are not used. Extracted performances are
+  derived from the parent swim, not stored twice.
 
 ### Score yourself
 

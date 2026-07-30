@@ -44,9 +44,11 @@ SwimTracker/
 
 1. Open **`SwimTracker.xcodeproj`** in Xcode.
 2. **SwimTracker** → **Signing & Capabilities**: automatic signing, your Team,
-   unique Bundle ID, App Group `group.<your-bundle-id>` (sync entitlements and
-   `AppGroup.identifier`).
-3. Same signing / App Groups for **SwimTrackerWidget**.
+   unique Bundle ID, App Group `group.<your-bundle-id>` (sync **both**
+   entitlements files and `AppGroup.identifier` in `Shared/AppGroup.swift`).
+3. Same signing / App Groups for **SwimTrackerWidget**
+   (`<app-bundle-id>.widget`). The Goals widget stays empty if the App Group
+   container isn’t reachable (common with free Personal Teams).
 4. Run on a physical iPhone (**⌘R**), then trust the developer profile under
    **Settings → General → VPN & Device Management**.
 5. Optionally add the Goals widget from the Home Screen **+** menu.

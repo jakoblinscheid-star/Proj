@@ -377,6 +377,7 @@ enum SwimSplits {
     /// Opening cumulative splits that can score as shorter events of the same stroke
     /// (Swimcloud-style extracted splits). Example: first 50 of a 100 Free → 50 Free;
     /// first 100 of a 200 Free → 100 Free. Mid-race flying segments are not included.
+    /// For individual medley, the first 50 also counts as 50 Fly (IM order starts with butterfly).
     static func openingCandidates(from time: SwimTime) -> [(event: SwimEvent, seconds: Double)] {
         guard !time.isRelay,
               isComplete(time.splits, distance: time.distance, isRelay: false)
@@ -391,6 +392,14 @@ enum SwimSplits {
             let event = SwimEvent(distance: distance, stroke: time.stroke, course: time.course)
             result.append((event: event, seconds: cumulative))
         }
+
+        // Individual medley opens with butterfly. On 200+ IM each stroke is ≥50, so the
+        // lead-off 50 is a real 50 Fly (not used for 100 IM, where 50 mixes fly+back).
+        if time.stroke == .medley, time.distance >= 200, let first = time.splits.first {
+            let fly50 = SwimEvent(distance: 50, stroke: .butterfly, course: time.course)
+            result.append((event: fly50, seconds: first))
+        }
+
         return result
     }
 }
@@ -948,10 +957,14 @@ final class Store {
     /// Builds a weighted overall from a set of times: the best score per individual
     /// event (including opening splits extracted from longer races), then the top
     /// four events combined as a renormalised weighted average.
-    func overallScore(for source: [SwimTime]) -> OverallScore {
+    ///
+    /// When `strokeFilter` is set, only performances of that stroke count — including
+    /// cross-stroke extracts (e.g. first 50 of a 200 IM → 50 Fly toward Fly).
+    func overallScore(for source: [SwimTime], strokeFilter: Stroke? = nil) -> OverallScore {
         var bestByEvent: [SwimEvent: Int] = [:]
 
         func consider(event: SwimEvent, points: Int) {
+            if let strokeFilter, event.stroke != strokeFilter { return }
             if let existing = bestByEvent[event], existing >= points { return }
             bestByEvent[event] = points
         }
@@ -1124,11 +1137,11 @@ final class Store {
 
     /// Overall score for every stroke (Free / Back / Breast / Fly / IM), heat-sheet
     /// order. Strokes with no scored swims still appear with an empty overall (0)
-    /// so the Home radar always has five axes.
+    /// so the Home radar always has five axes. Cross-stroke extracts (e.g. IM → Fly)
+    /// count toward the extracted stroke.
     var strokeOveralls: [StrokeScore] {
         Stroke.allCases.map { stroke in
-            let scoped = times.filter { !$0.isRelay && $0.stroke == stroke && $0.seconds != nil }
-            return StrokeScore(stroke: stroke, overall: overallScore(for: scoped))
+            StrokeScore(stroke: stroke, overall: overallScore(for: times, strokeFilter: stroke))
         }
     }
 
@@ -1357,14 +1370,16 @@ final class Store {
                 seasonBest: bestTimeInCurrentSeason(for: entry.event)?.seconds
             )
         }
-        GoalsWidgetStore.save(
+        let didSave = GoalsWidgetStore.save(
             GoalsWidgetSnapshot(
                 updatedAt: Date(),
                 seasonLabel: SwimSeason.label(),
                 entries: entries
             )
         )
-        WidgetBridge.reloadGoals()
+        if didSave {
+            WidgetBridge.reloadGoals()
+        }
     }
 
     // MARK: Backup (import / export)
