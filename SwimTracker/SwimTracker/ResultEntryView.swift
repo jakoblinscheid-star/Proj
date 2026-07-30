@@ -99,6 +99,10 @@ struct ResultEntryView: View {
         availableDistances.contains(distance)
     }
 
+    private var derivesFinalFromSplits: Bool {
+        SwimSplits.supportsSplits(distance: distance, isRelay: isRelay)
+    }
+
     var body: some View {
         Form {
             Section("Event") {
@@ -145,21 +149,23 @@ struct ResultEntryView: View {
                 relaySection
             }
 
-            Section {
-                SwimTimePad(seconds: $timeSeconds)
-            } header: {
-                Text(isRelay ? "Relay time (optional)" : "Time (optional)")
-            } footer: {
-                HStack {
-                    Text(timeSeconds > 0 ? timeSeconds.asSwimTime : "No time yet")
-                        .monospacedDigit()
-                    Spacer()
-                    if let previewScore {
-                        Text("\(previewScore) pts")
+            if !derivesFinalFromSplits {
+                Section {
+                    SwimTimePad(seconds: $timeSeconds)
+                } header: {
+                    Text(isRelay ? "Relay time (optional)" : "Time (optional)")
+                } footer: {
+                    HStack {
+                        Text(timeSeconds > 0 ? timeSeconds.asSwimTime : "No time yet")
+                            .monospacedDigit()
+                        Spacer()
+                        if let previewScore {
+                            Text("\(previewScore) pts")
+                        }
                     }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(timeSeconds > 0 ? Theme.accent : .secondary)
                 }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(timeSeconds > 0 ? Theme.accent : .secondary)
             }
 
             if isRelay {
@@ -180,8 +186,7 @@ struct ResultEntryView: View {
                 unit: course.unit,
                 isRelay: isRelay,
                 splits: $splitValues,
-                finalSeconds: timeSeconds,
-                onUseSplitTotal: { timeSeconds = $0 }
+                onFinalFromSplits: { timeSeconds = $0 }
             )
 
             Section("Note") {

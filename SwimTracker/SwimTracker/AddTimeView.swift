@@ -71,27 +71,23 @@ struct AddTimeView: View {
         timeSeconds > 0 && availableDistances.contains(distance)
     }
 
-    private var splitsMismatchFinal: Bool {
-        let expected = SwimSplits.fiftyCount(distance: distance, isRelay: false)
-        let values = Array(splitValues.prefix(expected))
-        guard timeSeconds > 0,
-              SwimSplits.isComplete(values, distance: distance, isRelay: false) else { return false }
-        let total = values.reduce(0, +)
-        return abs(total - timeSeconds) >= 0.005
+    private var derivesFinalFromSplits: Bool {
+        SwimSplits.supportsSplits(distance: distance, isRelay: false)
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 eventSection
-                timeSection
+                if !derivesFinalFromSplits {
+                    timeSection
+                }
                 SplitEntrySection(
                     distance: distance,
                     unit: course.unit,
                     isRelay: false,
                     splits: $splitValues,
-                    finalSeconds: timeSeconds,
-                    onUseSplitTotal: { timeSeconds = $0 }
+                    onFinalFromSplits: { timeSeconds = $0 }
                 )
                 detailsSection
                 if editingID != nil {
@@ -164,9 +160,7 @@ struct AddTimeView: View {
                 Text(timeSeconds > 0 ? timeSeconds.asSwimTime : "—")
                     .monospacedDigit()
                 Spacer()
-                if splitsMismatchFinal {
-                    Text("Splits don’t add up")
-                } else if let previewScore {
+                if let previewScore {
                     Text("\(previewScore) World Aquatics pts")
                 } else if timeSeconds > 0 {
                     Text("No score for this event")
@@ -175,7 +169,7 @@ struct AddTimeView: View {
                 }
             }
             .font(.subheadline.weight(.medium))
-            .foregroundStyle(splitsMismatchFinal ? Theme.danger : (previewScore != nil ? Theme.accent : .secondary))
+            .foregroundStyle(previewScore != nil ? Theme.accent : .secondary)
         }
     }
 
