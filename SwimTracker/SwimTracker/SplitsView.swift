@@ -202,7 +202,9 @@ struct SplitEntrySection: View {
         ) else { return }
         // Don’t overwrite the field the user is actively editing.
         switch (missing, editingField) {
-        case (.final, .final), (.split(let a), .split(let b)) where a == b:
+        case (.final, .final):
+            return
+        case (.split(let a), .split(let b)) where a == b:
             return
         default:
             break
