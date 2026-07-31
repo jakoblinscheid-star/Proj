@@ -336,6 +336,63 @@ enum SwimSplits {
             && splits.allSatisfy { $0 > 0 }
     }
 
+    /// Which single blank among the 50s + final can be solved from the rest.
+    enum MissingField: Equatable {
+        case split(Int)
+        case final
+    }
+
+    /// If exactly one of the 50s or the final is empty, returns that field.
+    static func singleMissingField(
+        splits: [Double],
+        finalSeconds: Double,
+        distance: Int,
+        isRelay: Bool = false
+    ) -> MissingField? {
+        let expected = fiftyCount(distance: distance, isRelay: isRelay)
+        guard expected >= 2 else { return nil }
+        var missing: [MissingField] = []
+        for index in 0..<expected {
+            if (index < splits.count ? splits[index] : 0) <= 0 {
+                missing.append(.split(index))
+            }
+        }
+        if finalSeconds <= 0 { missing.append(.final) }
+        return missing.count == 1 ? missing[0] : nil
+    }
+
+    /// Value that fills the one blank so splits sum to the final (hundredths).
+    /// Returns nil when it can’t produce a positive swim time.
+    static func solvedMissingValue(
+        splits: [Double],
+        finalSeconds: Double,
+        distance: Int,
+        isRelay: Bool = false
+    ) -> Double? {
+        guard let missing = singleMissingField(
+            splits: splits,
+            finalSeconds: finalSeconds,
+            distance: distance,
+            isRelay: isRelay
+        ) else { return nil }
+        let expected = fiftyCount(distance: distance, isRelay: isRelay)
+        switch missing {
+        case .final:
+            let total = splits.prefix(expected).reduce(0, +)
+            return total > 0 ? roundToHundredths(total) : nil
+        case .split(let index):
+            let others = splits.prefix(expected).enumerated()
+                .filter { $0.offset != index }
+                .reduce(0.0) { $0 + $1.element }
+            let remainder = finalSeconds - others
+            return remainder > 0 ? roundToHundredths(remainder) : nil
+        }
+    }
+
+    static func roundToHundredths(_ seconds: Double) -> Double {
+        (seconds * 100).rounded() / 100
+    }
+
     /// Segment lengths for the view control (e.g. 200 → 50, 100).
     static func displayModes(distance: Int, isRelay: Bool = false) -> [Int] {
         guard supportsSplits(distance: distance, isRelay: isRelay) else { return [] }

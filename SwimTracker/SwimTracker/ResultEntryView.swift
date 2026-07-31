@@ -186,7 +186,7 @@ struct ResultEntryView: View {
                 unit: course.unit,
                 isRelay: isRelay,
                 splits: $splitValues,
-                onFinalFromSplits: { timeSeconds = $0 }
+                finalSeconds: $timeSeconds
             )
 
             Section("Note") {

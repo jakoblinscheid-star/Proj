@@ -1,17 +1,21 @@
 import SwiftUI
 
-/// Enter interval times for each 50. Tap a row to edit it inline with the shared time pad.
-/// Final time is the sum of all 50s once every split is entered.
+/// Enter interval times for each 50, plus an editable final. Tap a row to edit
+/// inline. When only one value is left blank, it is filled automatically.
 struct SplitEntrySection: View {
     let distance: Int
     let unit: String
     let isRelay: Bool
     /// Parallel to each 50; `0` means not entered yet.
     @Binding var splits: [Double]
-    /// Called with the split total when complete, or `0` while incomplete.
-    var onFinalFromSplits: ((Double) -> Void)? = nil
+    @Binding var finalSeconds: Double
 
-    @State private var editingIndex: Int = 0
+    private enum EditingField: Equatable {
+        case split(Int)
+        case final
+    }
+
+    @State private var editingField: EditingField = .split(0)
 
     private var expectedCount: Int {
         SwimSplits.fiftyCount(distance: distance, isRelay: isRelay)
@@ -29,6 +33,25 @@ struct SplitEntrySection: View {
 
     private var splitTotal: Double? {
         completeSplits?.reduce(0, +)
+    }
+
+    private var footerIsWarning: Bool {
+        if let splitTotal, finalSeconds > 0 {
+            return abs(splitTotal - finalSeconds) >= 0.005
+        }
+        guard finalSeconds > 0,
+              SwimSplits.singleMissingField(
+                splits: splits,
+                finalSeconds: finalSeconds,
+                distance: distance,
+                isRelay: isRelay
+              ) != nil else { return false }
+        return SwimSplits.solvedMissingValue(
+            splits: splits,
+            finalSeconds: finalSeconds,
+            distance: distance,
+            isRelay: isRelay
+        ) == nil
     }
 
     @ViewBuilder
@@ -49,32 +72,23 @@ struct SplitEntrySection: View {
     private var entrySection: some View {
         Section {
             ForEach(0..<expectedCount, id: \.self) { index in
-                Button {
-                    editingIndex = index
-                } label: {
-                    HStack {
-                        Text(SwimSplits.rangeLabel(index: index, segmentDistance: 50, unit: unit))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Text(splits[safe: index].map { $0 > 0 ? $0.asSwimTime : "Add" } ?? "Add")
-                            .foregroundStyle(valueColor(for: index))
-                            .monospacedDigit()
-                    }
-                }
-                .buttonStyle(.plain)
+                valueRow(
+                    title: SwimSplits.rangeLabel(index: index, segmentDistance: 50, unit: unit),
+                    seconds: splits[safe: index] ?? 0,
+                    field: .split(index)
+                )
 
-                if editingIndex == index {
-                    SwimTimePad(seconds: binding(for: index))
+                if editingField == .split(index) {
+                    SwimTimePad(seconds: binding(for: .split(index)))
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
                 }
             }
 
-            HStack {
-                Text("Final time")
-                Spacer()
-                Text(splitTotal?.asSwimTime ?? "—")
-                    .monospacedDigit()
-                    .foregroundStyle(splitTotal != nil ? Theme.accent : .secondary)
+            valueRow(title: "Final time", seconds: finalSeconds, field: .final)
+
+            if editingField == .final {
+                SwimTimePad(seconds: binding(for: .final))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
             }
 
             if enteredCount > 0 {
@@ -85,59 +99,135 @@ struct SplitEntrySection: View {
         } header: {
             Text("Splits (each 50)")
         } footer: {
-            Text(footerText)
+            Label(footerText, systemImage: footerIsWarning ? "exclamationmark.triangle.fill" : "info.circle")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(footerIsWarning ? Theme.danger : .secondary)
+                .symbolRenderingMode(.hierarchical)
         }
         .onAppear {
             resizeIfNeeded()
-            publishFinalFromSplits()
+            autofillIfNeeded()
         }
         .onChange(of: distance) { _, _ in
             resizeIfNeeded()
-            publishFinalFromSplits()
+            autofillIfNeeded()
         }
         .onChange(of: isRelay) { _, _ in
             resizeIfNeeded()
-            publishFinalFromSplits()
+            autofillIfNeeded()
         }
         .onChange(of: splits) { _, _ in
-            publishFinalFromSplits()
+            autofillIfNeeded()
+        }
+        .onChange(of: finalSeconds) { _, _ in
+            autofillIfNeeded()
         }
     }
 
-    private func valueColor(for index: Int) -> Color {
-        if editingIndex == index { return Theme.accent }
-        guard let value = splits[safe: index], value > 0 else { return Theme.accent }
-        return .primary
+    private func valueRow(title: String, seconds: Double, field: EditingField) -> some View {
+        Button {
+            editingField = field
+        } label: {
+            HStack {
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(seconds > 0 ? seconds.asSwimTime : "Add")
+                    .foregroundStyle(valueColor(seconds: seconds, field: field))
+                    .monospacedDigit()
+            }
+        }
+        .buttonStyle(.plain)
     }
 
-    private func binding(for index: Int) -> Binding<Double> {
-        Binding(
-            get: { splits[safe: index] ?? 0 },
-            set: { newValue in
-                guard splits.indices.contains(index) else { return }
-                splits[index] = newValue
-            }
-        )
+    private func valueColor(seconds: Double, field: EditingField) -> Color {
+        if editingField == field { return Theme.accent }
+        return seconds > 0 ? .primary : Theme.accent
+    }
+
+    private func binding(for field: EditingField) -> Binding<Double> {
+        switch field {
+        case .final:
+            return $finalSeconds
+        case .split(let index):
+            return Binding(
+                get: { splits[safe: index] ?? 0 },
+                set: { newValue in
+                    guard splits.indices.contains(index) else { return }
+                    splits[index] = newValue
+                }
+            )
+        }
     }
 
     private var footerText: String {
-        if let splitTotal {
-            return "Final time is the sum of your 50s: \(splitTotal.asSwimTime)."
+        if let splitTotal, finalSeconds > 0 {
+            if abs(splitTotal - finalSeconds) < 0.005 {
+                return "Splits sum to \(splitTotal.asSwimTime), matching the final time."
+            }
+            return "Splits don’t add up — total \(splitTotal.asSwimTime) vs final \(finalSeconds.asSwimTime)."
         }
-        return "Enter all \(expectedCount) fifties. Final time is their sum; incomplete splits are discarded on save."
+        if let missing = SwimSplits.singleMissingField(
+            splits: splits,
+            finalSeconds: finalSeconds,
+            distance: distance,
+            isRelay: isRelay
+        ) {
+            if SwimSplits.solvedMissingValue(
+                splits: splits,
+                finalSeconds: finalSeconds,
+                distance: distance,
+                isRelay: isRelay
+            ) == nil {
+                return "Can’t solve the missing value — check that the final is larger than the other splits."
+            }
+            switch missing {
+            case .final:
+                return "Final time will fill in from the splits."
+            case .split(let index):
+                let label = SwimSplits.rangeLabel(index: index, segmentDistance: 50, unit: unit)
+                return "\(label) will fill in from the final and other splits."
+            }
+        }
+        return "Enter the 50s and final. When only one value is left, it’s calculated for you."
     }
 
-    private func publishFinalFromSplits() {
+    private func autofillIfNeeded() {
         guard expectedCount >= 2 else { return }
-        onFinalFromSplits?(splitTotal ?? 0)
+        guard let missing = SwimSplits.singleMissingField(
+            splits: splits,
+            finalSeconds: finalSeconds,
+            distance: distance,
+            isRelay: isRelay
+        ) else { return }
+        // Don’t overwrite the field the user is actively editing.
+        switch (missing, editingField) {
+        case (.final, .final), (.split(let a), .split(let b)) where a == b:
+            return
+        default:
+            break
+        }
+        guard let value = SwimSplits.solvedMissingValue(
+            splits: splits,
+            finalSeconds: finalSeconds,
+            distance: distance,
+            isRelay: isRelay
+        ) else { return }
+
+        switch missing {
+        case .final:
+            finalSeconds = value
+        case .split(let index):
+            resizeIfNeeded()
+            guard splits.indices.contains(index) else { return }
+            splits[index] = value
+        }
     }
 
     private func resizeIfNeeded() {
         guard expectedCount >= 2 else {
             if !splits.isEmpty { splits = [] }
-            editingIndex = 0
+            editingField = .split(0)
             return
         }
         if splits.count < expectedCount {
@@ -145,8 +235,8 @@ struct SplitEntrySection: View {
         } else if splits.count > expectedCount {
             splits = Array(splits.prefix(expectedCount))
         }
-        if editingIndex >= expectedCount {
-            editingIndex = max(expectedCount - 1, 0)
+        if case .split(let index) = editingField, index >= expectedCount {
+            editingField = .split(max(expectedCount - 1, 0))
         }
     }
 }

@@ -3,6 +3,8 @@ import SwiftUI
 /// Radar (spider) chart of overall scores for each stroke.
 struct StrokeRadarChart: View {
     let scores: [StrokeScore]
+    /// Plot height; larger when shown in the expanded reader.
+    var height: CGFloat = 280
 
     /// Outer ring of the chart. World Aquatics base = 1000; expand if any stroke is higher.
     private var maxValue: Double {
@@ -29,7 +31,7 @@ struct StrokeRadarChart: View {
                     vertexLabels(center: center, radius: radius)
                 }
             }
-            .frame(height: 280)
+            .frame(height: height)
             .padding(.vertical, 4)
 
             scoreLegend

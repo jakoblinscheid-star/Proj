@@ -87,7 +87,7 @@ struct AddTimeView: View {
                     unit: course.unit,
                     isRelay: false,
                     splits: $splitValues,
-                    onFinalFromSplits: { timeSeconds = $0 }
+                    finalSeconds: $timeSeconds
                 )
                 detailsSection
                 if editingID != nil {

@@ -29,6 +29,7 @@
 		3B0000000000000000000015 /* MeetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000015 /* MeetDetailView.swift */; };
 		3B0000000000000000000016 /* ResultEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000016 /* ResultEntryView.swift */; };
 		3B0000000000000000000017 /* RadarChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000017 /* RadarChartView.swift */; };
+		3B0000000000000000000021 /* ExpandableChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000021 /* ExpandableChartView.swift */; };
 		3B0000000000000000000018 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000018 /* GoalsView.swift */; };
 		3B0000000000000000000019 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000019 /* AppGroup.swift */; };
 		3B000000000000000000001A /* GoalsWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B000000000000000000001A /* GoalsWidgetSnapshot.swift */; };
@@ -90,6 +91,7 @@
 		2B0000000000000000000015 /* MeetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetDetailView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000016 /* ResultEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultEntryView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000017 /* RadarChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadarChartView.swift; sourceTree = "<group>"; };
+		2B0000000000000000000021 /* ExpandableChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpandableChartView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000018 /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
 		2B0000000000000000000019 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
 		2B000000000000000000001A /* GoalsWidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidgetSnapshot.swift; sourceTree = "<group>"; };
@@ -164,6 +166,7 @@
 				2B0000000000000000000015 /* MeetDetailView.swift */,
 				2B0000000000000000000016 /* ResultEntryView.swift */,
 				2B0000000000000000000017 /* RadarChartView.swift */,
+				2B0000000000000000000021 /* ExpandableChartView.swift */,
 				2B0000000000000000000018 /* GoalsView.swift */,
 				2B000000000000000000001B /* WidgetBridge.swift */,
 				2B000000000000000000001C /* SwimTracker.entitlements */,
@@ -313,6 +316,7 @@
 				3B0000000000000000000015 /* MeetDetailView.swift in Sources */,
 				3B0000000000000000000016 /* ResultEntryView.swift in Sources */,
 				3B0000000000000000000017 /* RadarChartView.swift in Sources */,
+				3B0000000000000000000021 /* ExpandableChartView.swift in Sources */,
 				3B0000000000000000000018 /* GoalsView.swift in Sources */,
 				3B0000000000000000000019 /* AppGroup.swift in Sources */,
 				3B000000000000000000001A /* GoalsWidgetSnapshot.swift in Sources */,

@@ -55,8 +55,15 @@ struct HomeView: View {
 
             if hasStrokeScores {
                 Section {
-                    StrokeRadarChart(scores: strokeScores)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    ExpandableChartContainer(
+                        title: "By stroke",
+                        supportsOrientationToggle: false
+                    ) {
+                        StrokeRadarChart(scores: strokeScores)
+                    } expanded: { _ in
+                        StrokeRadarChart(scores: strokeScores, height: 420)
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 } header: {
                     Text("By stroke")
                 } footer: {
