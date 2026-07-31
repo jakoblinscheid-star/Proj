@@ -322,7 +322,7 @@ struct ScoreView: View {
             }
             .chartXScale(domain: scoreDomain)
             .chartYAxis {
-                AxisMarks(values: data.map(\.periodStart), position: .leading) { value in
+                AxisMarks(position: .leading, values: data.map(\.periodStart)) { value in
                     AxisGridLine()
                     AxisValueLabel {
                         if let date = value.as(Date.self),
