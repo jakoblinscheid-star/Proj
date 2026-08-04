@@ -1,11 +1,15 @@
 # Go / no-go: unofficial Data Hub pull for SwimTracker
 
+## Context
+
+Personal-only tool — not marketed or distributed to other people. That removes App Store / “official integration” product risk from the decision; remaining risk is API breakage and whatever USA Swimming ToS means for your own use.
+
 ## Verdict
 
-**Conditional GO for a personal-bests-only import.**  
-**NO-GO for full meet-history sync** until athlete login (or another authorized path) is solved.
+**GO for personal-bests import now** (anonymous `times-api` path).  
+**GO later for full meet history** if you want it — implement athlete login to unlock `GetAllTimesForFilters` / meet endpoints. Worth it for a private app; still brittle when Data Hub redeploys.
 
-Anonymous `times-api` access is real and sufficient to import an athlete’s current SWIMS personal bests (with meet name, date, and often splits). It is **not** sufficient to rebuild a full season log the way Meet Mobile / a Hy-Tek file would.
+Anonymous access is enough to seed PBs (meet name, date, often splits). Full season history still needs IdP session headers (`Usas-Sub-Id` / `Usas-Session-Id`).
 
 ## Evidence
 
@@ -22,30 +26,24 @@ Contract notes: [`CONTRACT.md`](CONTRACT.md)
 
 ## Recommendation
 
-### Ship next (if you want Data Hub at all)
+### Build next
 
-1. **In-app “Import personal bests from Data Hub”** (unofficial)
-   - User searches name / pastes `memberId`
-   - Preview PB rows → merge into `SwimTime` + `Meet` (do **not** use backup replace)
-   - Copy must say these are **bests only**, source is unofficial, and USA Swimming may break it
-2. Keep a **paste/CSV** path for non-PB swims and for when the API changes
+1. **In-app “Import personal bests from Data Hub”**
+   - Search name / paste `memberId`
+   - Preview PB rows → merge into `SwimTime` + `Meet` (not backup replace)
+   - Label as bests-only; expect occasional breakage when USA Swimming ships SPA/API changes
+2. Optional: paste/CSV as a backup when the API is down or you need non-PB swims
 
-### Do not ship yet
+### Optional follow-on (personal use makes this reasonable)
 
-- Branding as “SWIMS sync” or “official USA Swimming”
-- Full-history sync via scraping / stolen session cookies without a clear athlete login UX
-- Vendor API application solely for a personal tracker (wrong product fit)
+**Authenticated full history:**
 
-### Later option: authenticated full history
-
-If full history becomes the goal:
-
-1. Use `ASWebAuthenticationSession` (or similar) against `dhy-prod.usaswimming.org`
-2. Capture `Usas-Sub-Id` / `Usas-Session-Id` the SPA uses after `/bff/userinfo`
+1. Log in via `ASWebAuthenticationSession` (or cookie capture) against `dhy-prod.usaswimming.org`
+2. Reuse SPA headers: `Usas-Sub-Id` / `Usas-Session-Id` from `/bff/userinfo`
 3. Call `GetAllTimesForFilters` + meet endpoints
-4. Re-validate App Review / ToS risk before release
+4. No vendor API application needed for a private tool
 
-Flags that would flip full-history to GO: documented athlete OAuth that yields those headers, stable all-times JSON, and acceptance of unofficial-client maintenance.
+Skip public branding concerns; just keep the client easy to fix when endpoints move.
 
 ## Why not stop at paste/CSV only?
 
