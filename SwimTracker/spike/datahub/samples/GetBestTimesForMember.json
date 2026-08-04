@@ -1,0 +1,50 @@
+[
+  {
+    "swimTimeRecognitionId": 225672313,
+    "strokeName": "Freestyle",
+    "strokeAbbreviation": "FR",
+    "distance": 50,
+    "courseCode": "SCY",
+    "swimTime": "26.07"
+  },
+  {
+    "swimTimeRecognitionId": 225672315,
+    "strokeName": "Freestyle",
+    "strokeAbbreviation": "FR",
+    "distance": 100,
+    "courseCode": "SCY",
+    "swimTime": "58.37"
+  },
+  {
+    "swimTimeRecognitionId": 224178640,
+    "strokeName": "Freestyle",
+    "strokeAbbreviation": "FR",
+    "distance": 200,
+    "courseCode": "SCY",
+    "swimTime": "2:14.66"
+  },
+  {
+    "swimTimeRecognitionId": 224212620,
+    "strokeName": "Breaststroke",
+    "strokeAbbreviation": "BR",
+    "distance": 100,
+    "courseCode": "SCY",
+    "swimTime": "1:24.77"
+  },
+  {
+    "swimTimeRecognitionId": 224178639,
+    "strokeName": "Butterfly",
+    "strokeAbbreviation": "FL",
+    "distance": 100,
+    "courseCode": "SCY",
+    "swimTime": "1:11.63"
+  },
+  {
+    "swimTimeRecognitionId": 224212622,
+    "strokeName": "Individual Medley",
+    "strokeAbbreviation": "IM",
+    "distance": 200,
+    "courseCode": "SCY",
+    "swimTime": "2:47.07"
+  }
+]
