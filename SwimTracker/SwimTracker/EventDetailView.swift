@@ -197,97 +197,46 @@ struct EventDetailView: View {
     private var progressionSection: some View {
         Section("Progression") {
             ExpandableChartContainer(title: "\(event.name) progression") {
-                progressionChart(orientation: .vertical, height: 220)
-            } expanded: { orientation in
-                progressionChart(
-                    orientation: orientation,
-                    height: orientation == .horizontal
-                        ? max(320, CGFloat(performances.count) * 44)
-                        : 320
-                )
+                progressionChart(height: 220)
+            } expanded: {
+                progressionChart(height: 320)
             }
         }
     }
 
-    @ViewBuilder
-    private func progressionChart(orientation: ChartOrientation, height: CGFloat) -> some View {
-        switch orientation {
-        case .vertical:
-            Chart(performances) { performance in
-                LineMark(
-                    x: .value("Date", performance.date),
-                    y: .value("Time", performance.seconds)
-                )
-                .foregroundStyle(Theme.accent)
-                .interpolationMethod(.monotone)
+    private func progressionChart(height: CGFloat) -> some View {
+        Chart(performances) { performance in
+            LineMark(
+                x: .value("Date", performance.date),
+                y: .value("Time", performance.seconds)
+            )
+            .foregroundStyle(Theme.accent)
+            .interpolationMethod(.monotone)
 
-                PointMark(
-                    x: .value("Date", performance.date),
-                    y: .value("Time", performance.seconds)
-                )
-                .foregroundStyle(performance.id == best?.id ? Theme.success : Theme.accent)
-                .symbolSize(performance.id == best?.id ? 90 : 50)
-            }
-            .chartYScale(domain: .automatic(includesZero: false, reversed: true))
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let seconds = value.as(Double.self) {
-                            Text(seconds.asSwimTime)
-                                .font(.caption2)
-                        }
-                    }
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 4))
-            }
-            .frame(height: height)
-            .padding(.vertical, 8)
-
-        case .horizontal:
-            Chart(performances) { performance in
-                LineMark(
-                    x: .value("Time", performance.seconds),
-                    y: .value("Date", performance.date)
-                )
-                .foregroundStyle(Theme.accent)
-                .interpolationMethod(.monotone)
-
-                PointMark(
-                    x: .value("Time", performance.seconds),
-                    y: .value("Date", performance.date)
-                )
-                .foregroundStyle(performance.id == best?.id ? Theme.success : Theme.accent)
-                .symbolSize(performance.id == best?.id ? 90 : 50)
-            }
-            .chartXScale(domain: .automatic(includesZero: false, reversed: true))
-            .chartXAxis {
-                AxisMarks { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let seconds = value.as(Double.self) {
-                            Text(seconds.asSwimTime)
-                                .font(.caption2)
-                        }
-                    }
-                }
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date, format: .dateTime.month(.abbreviated).day())
-                                .font(.caption2)
-                        }
-                    }
-                }
-            }
-            .frame(height: height)
-            .padding(.vertical, 8)
+            PointMark(
+                x: .value("Date", performance.date),
+                y: .value("Time", performance.seconds)
+            )
+            .foregroundStyle(performance.id == best?.id ? Theme.success : Theme.accent)
+            .symbolSize(performance.id == best?.id ? 90 : 50)
         }
+        .chartYScale(domain: .automatic(includesZero: false, reversed: true))
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let seconds = value.as(Double.self) {
+                        Text(seconds.asSwimTime)
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4))
+        }
+        .frame(height: height)
+        .padding(.vertical, 8)
     }
 
     private var otherTimesSection: some View {

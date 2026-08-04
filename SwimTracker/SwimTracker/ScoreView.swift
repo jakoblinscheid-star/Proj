@@ -206,9 +206,9 @@ struct ScoreView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ExpandableChartContainer(title: progressionChartTitle) {
-                    progressionChart(data, orientation: .vertical, height: 220)
-                } expanded: { orientation in
-                    progressionChart(data, orientation: orientation, height: progressionExpandedHeight(dataCount: data.count, orientation: orientation))
+                    progressionChart(data, height: 220)
+                } expanded: {
+                    progressionChart(data, height: 320)
                 }
             }
         } header: {
@@ -243,101 +243,44 @@ struct ScoreView: View {
         return "Score by year"
     }
 
-    private func progressionExpandedHeight(dataCount: Int, orientation: ChartOrientation) -> CGFloat {
-        switch orientation {
-        case .vertical:
-            return 320
-        case .horizontal:
-            return max(320, CGFloat(dataCount) * 44)
-        }
-    }
-
-    @ViewBuilder
-    private func progressionChart(
-        _ data: [ProgressionScore],
-        orientation: ChartOrientation,
-        height: CGFloat
-    ) -> some View {
+    private func progressionChart(_ data: [ProgressionScore], height: CGFloat) -> some View {
         let scoreDomain = seasonYDomain(for: data)
-        switch orientation {
-        case .vertical:
-            Chart(data) { point in
-                LineMark(
-                    x: .value("Period", point.periodStart),
-                    y: .value("Score", point.value)
-                )
-                .foregroundStyle(Theme.accent)
-                .interpolationMethod(.monotone)
+        return Chart(data) { point in
+            LineMark(
+                x: .value("Period", point.periodStart),
+                y: .value("Score", point.value)
+            )
+            .foregroundStyle(Theme.accent)
+            .interpolationMethod(.monotone)
 
-                PointMark(
-                    x: .value("Period", point.periodStart),
-                    y: .value("Score", point.value)
-                )
-                .foregroundStyle(Theme.accent)
-                .annotation(position: .top) {
-                    if shouldAnnotate(point, in: data) {
-                        Text("\(point.value)")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
+            PointMark(
+                x: .value("Period", point.periodStart),
+                y: .value("Score", point.value)
+            )
+            .foregroundStyle(Theme.accent)
+            .annotation(position: .top) {
+                if shouldAnnotate(point, in: data) {
+                    Text("\(point.value)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
                 }
             }
-            .chartYScale(domain: scoreDomain)
-            .chartXAxis {
-                AxisMarks(values: axisValues(for: data)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self),
-                           let point = data.first(where: { $0.periodStart == date }) {
-                            Text(point.label)
-                                .font(.caption2)
-                        }
-                    }
-                }
-            }
-            .frame(height: height)
-            .padding(.vertical, 8)
-
-        case .horizontal:
-            Chart(data) { point in
-                LineMark(
-                    x: .value("Score", point.value),
-                    y: .value("Period", point.periodStart)
-                )
-                .foregroundStyle(Theme.accent)
-                .interpolationMethod(.monotone)
-
-                PointMark(
-                    x: .value("Score", point.value),
-                    y: .value("Period", point.periodStart)
-                )
-                .foregroundStyle(Theme.accent)
-                .annotation(position: .trailing) {
-                    if shouldAnnotate(point, in: data) {
-                        Text("\(point.value)")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .chartXScale(domain: scoreDomain)
-            .chartYAxis {
-                AxisMarks(position: .leading, values: data.map(\.periodStart)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self),
-                           let point = data.first(where: { $0.periodStart == date }) {
-                            Text(point.label)
-                                .font(.caption2)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.trailing)
-                        }
-                    }
-                }
-            }
-            .frame(height: height)
-            .padding(.vertical, 8)
         }
+        .chartYScale(domain: scoreDomain)
+        .chartXAxis {
+            AxisMarks(values: axisValues(for: data)) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let date = value.as(Date.self),
+                       let point = data.first(where: { $0.periodStart == date }) {
+                        Text(point.label)
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .frame(height: height)
+        .padding(.vertical, 8)
     }
 
     /// Season charts pin 0 so August resets are visible; year charts leave room above the data.
