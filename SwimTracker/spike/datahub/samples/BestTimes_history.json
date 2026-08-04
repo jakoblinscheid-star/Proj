@@ -1,0 +1,20 @@
+[
+  {
+    "courseId": 1,
+    "distance": 50,
+    "strokeAbbreviation": "FR",
+    "courseCode": "SCY",
+    "meetName": "2026 AD Section 2 Div 2 Boys Championships",
+    "eventCode": "50 FR SCY",
+    "swimDate": "Feb 14, 2026",
+    "fullName": "Owen Smith",
+    "swimmerAge": 17,
+    "lscCode": "AD",
+    "clubName": "Unattached",
+    "swimTime": "26.07",
+    "timeDrop": null,
+    "finishPosition": 8,
+    "timeStandard": "B",
+    "splits": null
+  }
+]

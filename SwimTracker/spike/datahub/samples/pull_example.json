@@ -1,0 +1,236 @@
+{
+  "member": {
+    "memberId": "7F23E4EC26C844",
+    "fullName": "Owen Patrick Smith",
+    "clubName": "Albany Starfish",
+    "lscCode": "AD",
+    "swimmerAge": 18,
+    "shortName": "Owen Smith",
+    "profilePicUrl": null,
+    "isNcaa": 0
+  },
+  "bestTimes": [
+    {
+      "swimTimeRecognitionId": 225672313,
+      "strokeName": "Freestyle",
+      "strokeAbbreviation": "FR",
+      "distance": 50,
+      "courseCode": "SCY",
+      "swimTime": "26.07"
+    },
+    {
+      "swimTimeRecognitionId": 225672315,
+      "strokeName": "Freestyle",
+      "strokeAbbreviation": "FR",
+      "distance": 100,
+      "courseCode": "SCY",
+      "swimTime": "58.37"
+    },
+    {
+      "swimTimeRecognitionId": 224178640,
+      "strokeName": "Freestyle",
+      "strokeAbbreviation": "FR",
+      "distance": 200,
+      "courseCode": "SCY",
+      "swimTime": "2:14.66"
+    },
+    {
+      "swimTimeRecognitionId": 224212620,
+      "strokeName": "Breaststroke",
+      "strokeAbbreviation": "BR",
+      "distance": 100,
+      "courseCode": "SCY",
+      "swimTime": "1:24.77"
+    },
+    {
+      "swimTimeRecognitionId": 224178639,
+      "strokeName": "Butterfly",
+      "strokeAbbreviation": "FL",
+      "distance": 100,
+      "courseCode": "SCY",
+      "swimTime": "1:11.63"
+    },
+    {
+      "swimTimeRecognitionId": 224212622,
+      "strokeName": "Individual Medley",
+      "strokeAbbreviation": "IM",
+      "distance": 200,
+      "courseCode": "SCY",
+      "swimTime": "2:47.07"
+    }
+  ],
+  "historyRows": [
+    {
+      "courseId": 1,
+      "distance": 50,
+      "strokeAbbreviation": "FR",
+      "courseCode": "SCY",
+      "meetName": "2026 AD Section 2 Div 2 Boys Championships",
+      "eventCode": "50 FR SCY",
+      "swimDate": "Feb 14, 2026",
+      "fullName": "Owen Smith",
+      "swimmerAge": 17,
+      "lscCode": "AD",
+      "clubName": "Unattached",
+      "swimTime": "26.07",
+      "timeDrop": null,
+      "finishPosition": 8,
+      "timeStandard": "B",
+      "splits": null
+    },
+    {
+      "courseId": 1,
+      "distance": 100,
+      "strokeAbbreviation": "BR",
+      "courseCode": "SCY",
+      "meetName": "2026 AD Starfish Trophy Invitational",
+      "eventCode": "100 BR SCY",
+      "swimDate": "Jan 11, 2026",
+      "fullName": "Owen Smith",
+      "swimmerAge": 17,
+      "lscCode": "AD",
+      "clubName": "Albany Starfish",
+      "swimTime": "1:24.77",
+      "timeDrop": null,
+      "finishPosition": 25,
+      "timeStandard": "Slower Than B",
+      "splits": [
+        {
+          "cumulativeDistance": 50.0,
+          "cumulativeSplitTime": "39.01",
+          "splitTime": "39.01"
+        },
+        {
+          "cumulativeDistance": 100.0,
+          "cumulativeSplitTime": "1:24.77",
+          "splitTime": "45.76"
+        }
+      ]
+    },
+    {
+      "courseId": 1,
+      "distance": 100,
+      "strokeAbbreviation": "FL",
+      "courseCode": "SCY",
+      "meetName": "2026 AD Schenectady-Colonie Invitational",
+      "eventCode": "100 FL SCY",
+      "swimDate": "Jan 10, 2026",
+      "fullName": "Owen Smith",
+      "swimmerAge": 17,
+      "lscCode": "AD",
+      "clubName": "Unattached",
+      "swimTime": "1:11.63",
+      "timeDrop": null,
+      "finishPosition": 17,
+      "timeStandard": "Slower Than B",
+      "splits": [
+        {
+          "cumulativeDistance": 50.0,
+          "cumulativeSplitTime": "33.04",
+          "splitTime": "33.04"
+        },
+        {
+          "cumulativeDistance": 100.0,
+          "cumulativeSplitTime": "1:11.63",
+          "splitTime": "38.59"
+        }
+      ]
+    },
+    {
+      "courseId": 1,
+      "distance": 100,
+      "strokeAbbreviation": "FR",
+      "courseCode": "SCY",
+      "meetName": "2026 AD Section 2 Div 2 Boys Championships",
+      "eventCode": "100 FR SCY",
+      "swimDate": "Feb 14, 2026",
+      "fullName": "Owen Smith",
+      "swimmerAge": 17,
+      "lscCode": "AD",
+      "clubName": "Unattached",
+      "swimTime": "58.37",
+      "timeDrop": -2.82,
+      "finishPosition": 10,
+      "timeStandard": "B",
+      "splits": null
+    },
+    {
+      "courseId": 1,
+      "distance": 200,
+      "strokeAbbreviation": "FR",
+      "courseCode": "SCY",
+      "meetName": "2026 AD Schenectady-Colonie Invitational",
+      "eventCode": "200 FR SCY",
+      "swimDate": "Jan 10, 2026",
+      "fullName": "Owen Smith",
+      "swimmerAge": 17,
+      "lscCode": "AD",
+      "clubName": "Unattached",
+      "swimTime": "2:14.66",
+      "timeDrop": null,
+      "finishPosition": 20,
+      "timeStandard": "Slower Than B",
+      "splits": [
+        {
+          "cumulativeDistance": 50.0,
+          "cumulativeSplitTime": "29.25",
+          "splitTime": "29.25"
+        },
+        {
+          "cumulativeDistance": 100.0,
+          "cumulativeSplitTime": "1:02.93",
+          "splitTime": "33.68"
+        },
+        {
+          "cumulativeDistance": 150.0,
+          "cumulativeSplitTime": "1:39.20",
+          "splitTime": "36.27"
+        },
+        {
+          "cumulativeDistance": 200.0,
+          "cumulativeSplitTime": "2:14.66",
+          "splitTime": "35.46"
+        }
+      ]
+    },
+    {
+      "courseId": 1,
+      "distance": 200,
+      "strokeAbbreviation": "IM",
+      "courseCode": "SCY",
+      "meetName": "2026 AD Starfish Trophy Invitational",
+      "eventCode": "200 IM SCY",
+      "swimDate": "Jan 11, 2026",
+      "fullName": "Owen Smith",
+      "swimmerAge": 17,
+      "lscCode": "AD",
+      "clubName": "Albany Starfish",
+      "swimTime": "2:47.07",
+      "timeDrop": null,
+      "finishPosition": 28,
+      "timeStandard": "Slower Than B",
+      "splits": [
+        {
+          "cumulativeDistance": 50.0,
+          "cumulativeSplitTime": "33.56",
+          "splitTime": "33.56"
+        },
+        {
+          "cumulativeDistance": 100.0,
+          "cumulativeSplitTime": "1:17.60",
+          "splitTime": "44.04"
+        },
+        {
+          "cumulativeDistance": 150.0,
+          "cumulativeSplitTime": "2:09.34",
+          "splitTime": "51.74"
+        },
+        {
+          "cumulativeDistance": 200.0,
+          "cumulativeSplitTime": "2:47.07",
+          "splitTime": "37.73"
+        }
+      ]
+    }
+  ]
+}
