@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingBaseTimes = false
+    @State private var showingDataHubImport = false
     @State private var exportDocument: SwimTrackerBackupDocument?
     @State private var showingExporter = false
     @State private var showingImportConfirm = false
@@ -65,6 +66,18 @@ struct SettingsView: View {
 
                 Section {
                     Button {
+                        showingDataHubImport = true
+                    } label: {
+                        Label("Import times from Data Hub…", systemImage: "icloud.and.arrow.down")
+                    }
+                } header: {
+                    Text("Import times")
+                } footer: {
+                    Text("Pull your USA Swimming personal bests into SwimTracker. Times already on this device are left alone.")
+                }
+
+                Section {
+                    Button {
                         prepareExport()
                     } label: {
                         Label("Export data", systemImage: "square.and.arrow.up")
@@ -73,12 +86,12 @@ struct SettingsView: View {
                     Button(role: .destructive) {
                         showingImportConfirm = true
                     } label: {
-                        Label("Import data…", systemImage: "square.and.arrow.down")
+                        Label("Import backup…", systemImage: "square.and.arrow.down")
                     }
                 } header: {
                     Text("Backup")
                 } footer: {
-                    Text("Export a JSON backup of your meets, times, goals, base times, and settings. Import replaces everything currently on this device.")
+                    Text("Export a JSON backup of your meets, times, goals, base times, and settings. Backup import replaces everything currently on this device.")
                 }
             }
             .navigationTitle("Settings")
@@ -90,6 +103,11 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingBaseTimes) {
                 BaseTimesView()
+            }
+            .sheet(isPresented: $showingDataHubImport) {
+                NavigationStack {
+                    DataHubImportView()
+                }
             }
             .fileExporter(
                 isPresented: $showingExporter,
